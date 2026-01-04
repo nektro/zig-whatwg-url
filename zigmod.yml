@@ -4,5 +4,4 @@ main: url.zig
 license: MPL-2.0
 description: A WHATWG URL-compatible parser for Zig
 root_dependencies:
-  - src: git https://github.com/nektro/zig-json
   - src: git https://github.com/nektro/zig-expect
