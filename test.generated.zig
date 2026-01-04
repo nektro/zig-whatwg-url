@@ -6,7 +6,10 @@ const expect = @import("expect").expect;
 
 pub fn parseFail(input: []const u8, base: ?[]const u8) !void {
     const allocator = std.testing.allocator;
-    _ = url.URL.parse(allocator, input, base) catch return;
+    _ = url.URL.parse(allocator, input, base) catch |err| switch (err) {
+        error.SkipZigTest => |e| return e,
+        else => return,
+    };
     return error.FailZigTest;
 }
 
