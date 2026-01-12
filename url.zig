@@ -185,6 +185,7 @@ pub const URL = struct {
                 },
                 .no_scheme => {
                     // 1. If base is null, or base has an opaque path and c is not U+0023 (#), missing-scheme-non-relative-URL validation error, return failure.
+                    if (base == null) return error.InvalidURL;
                     // 2. Otherwise, if base has an opaque path and c is U+0023 (#), set url’s scheme to base’s scheme, url’s path to base’s path, url’s query to base’s query, url’s fragment to the empty string, and set state to fragment state.
                     // 3. Otherwise, if base’s scheme is not "file", set state to relative state and decrease pointer by 1.
                     // 4. Otherwise, set state to file state and decrease pointer by 1.
