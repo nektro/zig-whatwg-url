@@ -839,7 +839,7 @@ fn parseHost(allocator: std.mem.Allocator, input: []u8, isOpaque: bool) !URL.Hos
         // 1. If input does not end with U+005D (]), IPv6-unclosed validation error, return failure.
         if (!std.mem.endsWith(u8, input, "]")) return error.InvalidURL;
         // 2. Return the result of IPv6 parsing input with its leading U+005B ([) and trailing U+005D (]) removed.
-        const adr = try parseIPv6(input[1 .. input.len - 1 - 1]);
+        const adr = try parseIPv6(input[1 .. input.len - 1]);
         return .{ .ipv6 = adr };
     }
     // 2. If isOpaque is true, then return the result of opaque-host parsing input.
