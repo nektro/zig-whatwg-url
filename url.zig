@@ -66,10 +66,10 @@ pub const URL = struct {
 
         // 8.
         // codepoint index into inputl
-        var pointer: isize = 0;
+        var pointer: usize = 0;
         // byte index into inputl
         // moved at the same time as pointer
-        // if pointer is -1, i must not be read
+        // if pointer is > length, i must not be read
         var i: usize = 0;
         // inputl[i], must change in tandem with i
         var c: u8 = if (length > 0) inputl.items[i] else 0;
@@ -1078,12 +1078,11 @@ fn endsInANumber(input: []const u8) bool {
     // > This is equivalent to checking that last is "0X" or "0x", followed by zero or more ASCII hex digits.
     // 6. Return false.
 
-    _ = std.mem.splitBackwardsScalar;
     var end = input.len;
     var start: usize = if (std.mem.lastIndexOfScalar(u8, input[0..end], '.')) |i| i + 1 else 0;
     if (end - start == 0) {
         if (std.mem.count(u8, input, ".") == 0) return false;
-        end = start;
+        end = start - 1;
         start = if (std.mem.lastIndexOfScalar(u8, input[0..end], '.')) |i| i + 1 else 0;
     }
     const last = input[start..end];
