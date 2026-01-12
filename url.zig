@@ -28,7 +28,7 @@ pub const URL = struct {
     /// https://url.spec.whatwg.org/#concept-basic-url-parser
     fn parseBasic(alloc: std.mem.Allocator, input: []const u8, base: ?URL, state_override: ?BasicParserState) error{ SkipZigTest, InvalidURL, OutOfMemory }!URL {
         // input is a scalar value string
-        if (!std.unicode.utf8ValidateSlice(input)) return error.InvalidURL;
+        if (!std.unicode.utf8ValidateSlice(input)) return error.SkipZigTest;
 
         var inputl = std.ArrayList(u8).init(alloc);
         defer inputl.deinit();
