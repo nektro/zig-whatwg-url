@@ -5,6 +5,14 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const mode = b.option(std.builtin.Mode, "mode", "") orelse .Debug;
 
+    const gen_step = b.step("generate", "");
+    const gen_cmd = b.addSystemCommand(&.{ "bun", "./generate.ts" });
+    const gen_out = gen_cmd.addOutputFileArg("test.zig");
+    const gen_install = b.addInstallFile(gen_out, "test.zig");
+    gen_cmd.setCwd(b.path("."));
+    gen_cmd.addFileInput(b.path("generate.ts"));
+    gen_step.dependOn(&gen_install.step);
+
     const tests = b.addTest(.{
         .root_source_file = b.path("test.zig"),
         .target = target,

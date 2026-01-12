@@ -3,8 +3,7 @@ import casesraw from "./urltestdata.json";
 import casesidna from "./IdnaTestV2.json";
 
 const cases = casesraw.filter((v) => typeof v !== "string");
-closeSync(openSync("./test.generated.zig", "w", 0o777));
-const f = Bun.file("./test.generated.zig");
+const f = Bun.file(process.argv[2]!);
 const w = f.writer();
 
 w.write(`const std = @import("std");\n`);
