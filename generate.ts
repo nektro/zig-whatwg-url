@@ -80,8 +80,6 @@ pub fn parseIDNAPass(input: []const u8, output: []const u8) !void {
 `);
 
 w.write(`\n`);
-// prettier-ignore
-if (false)
 for (const c of cases.filter((v) => v.base == null && !!v.failure)) {
   w.write(`test { try parseFail("${stringEscape(c.input)}", null); }\n`);
 }
