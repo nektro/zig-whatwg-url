@@ -1059,8 +1059,16 @@ fn percentDecode(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
 /// https://url.spec.whatwg.org/#concept-domain-to-ascii
 // TODO:
 fn domainToAscii(allocator: std.mem.Allocator, domain: []const u8, beStrict: bool) ![]u8 {
-    _ = beStrict;
-    return allocator.dupe(u8, domain);
+    const result = try allocator.dupe(u8, domain);
+    errdefer allocator.free(result);
+    if (!beStrict) {
+        if (result.len == 0) return error.InvalidURL;
+        if (extras.matchesAny(u8, result, is_forbidden_domain_codepoint)) return error.InvalidURL;
+        return result;
+    }
+    std.debug.assert(result.len > 0);
+    std.debug.assert(!extras.matchesAny(u8, result, is_forbidden_domain_codepoint));
+    return result;
 }
 
 // https://url.spec.whatwg.org/#ends-in-a-number-checker
@@ -1225,6 +1233,14 @@ fn is_forbidden_host_codepoint(c: u8) bool {
     if (c == ']') return true;
     if (c == '^') return true;
     if (c == '|') return true;
+    return false;
+}
+/// https://url.spec.whatwg.org/#forbidden-domain-code-point
+fn is_forbidden_domain_codepoint(c: u8) bool {
+    if (is_forbidden_host_codepoint(c)) return true;
+    if (is_c0control(c)) return true;
+    if (c == '%') return true;
+    if (c == 0x7f) return true;
     return false;
 }
 /// https://url.spec.whatwg.org/#url-code-points
