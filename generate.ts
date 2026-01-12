@@ -45,8 +45,9 @@ pub fn parseFail(input: []const u8, base: ?[]const u8) !void {
 }
 
 pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin: []const u8, protocol: []const u8, username: []const u8, password: []const u8, host: []const u8, hostname: []const u8, port: []const u8, pathname: []const u8, search: []const u8, hash: []const u8) !void {
-    _ = input;
-    _ = base;
+    const allocator = std.testing.allocator;
+    const u = try url.URL.parse(allocator, input, base);
+    defer allocator.free(u.href);
     _ = href;
     _ = origin;
     _ = protocol;
@@ -58,7 +59,6 @@ pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin:
     _ = pathname;
     _ = search;
     _ = hash;
-    return error.SkipZigTest;
 }
 
 pub fn parseIDNAFail(input: []const u8) !void {
@@ -92,8 +92,6 @@ for (const c of cases.filter((v) => v.base != null && !!v.failure)) {
 }
 
 w.write(`\n`);
-// prettier-ignore
-if (false)
 for (const c of cases.filter((v) => v.base == null && !v.failure)) {
   w.write(`test { try parsePass("${E(c.input)}", null, "${E(c.href)}", "${E(c.origin)}", "${E(c.protocol)}", "${E(c.username)}", "${E(c.password)}", "${E(c.host)}", "${E(c.hostname)}", "${E(c.port)}", "${E(c.pathname)}", "${E(c.search)}", "${E(c.hash)}"); }\n`);
 }

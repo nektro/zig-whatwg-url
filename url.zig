@@ -100,7 +100,7 @@ pub const URL = struct {
                 .scheme_start => {
                     std.debug.assert(pointer == 0);
                     // 1. If c is an ASCII alpha, append c, lowercased, to buffer, and set state to scheme state.
-                    if (i != length and std.ascii.isAlphabetic(c)) {
+                    if (i < length and std.ascii.isAlphabetic(c)) {
                         try buffer.append(std.ascii.toLower(c));
                         state = .scheme;
                     }
@@ -158,7 +158,7 @@ pub const URL = struct {
                             state = .special_authority_slashes;
                         }
                         // 8. Otherwise, if remaining starts with an U+002F (/), set state to path or authority state and increase pointer by 1.
-                        else if (std.mem.startsWith(u8, inputl.items[i + l(inputl.items[i]) ..], "/")) {
+                        else if (std.mem.startsWith(u8, inputl.items[i + l(c) ..], "/")) {
                             state = .path_or_authority;
                             i += l(c);
                             c = inputl.items[i];
@@ -212,7 +212,9 @@ pub const URL = struct {
                     // 2. Otherwise, set state to path state, and decrease pointer by 1.
                     else {
                         state = .path;
-                        @panic("TODO");
+                        pointer -= 1;
+                        i = lastcpi(inputl.items[0..i]);
+                        c = inputl.items[i];
                     }
                 },
                 .relative => {
@@ -616,14 +618,14 @@ pub const URL = struct {
                         {}
                         // 2. If buffer is a double-dot URL path segment, then:
                         if (isDoubleDotPathSeg(buffer.items)) {
-                            @panic("TODO");
+                            // @panic("TODO");
                             // 1. Shorten url’s path.
                             // 2. If neither c is U+002F (/), nor url is special and c is U+005C (\), append the empty string to url’s path.
                             // > This means that for input /usr/.. the result is / and not a lack of a path.
                         }
                         // 3. Otherwise, if buffer is a single-dot URL path segment and if neither c is U+002F (/), nor url is special and c is U+005C (\), append the empty string to url’s path.
-                        else if (isSingleDotPathSeg(buffer.items)) {
-                            @panic("TODO");
+                        else if (isSingleDotPathSeg(buffer.items) and (c != '/' or !(isSchemeSpecial(scheme.items) and c == '\\'))) {
+                            // @panic("TODO");
                         }
                         // 4. Otherwise, if buffer is not a single-dot URL path segment, then:
                         else if (isSingleDotPathSeg(buffer.items)) {
@@ -745,7 +747,7 @@ pub const URL = struct {
             }
 
             // If after a run pointer points to the EOF code point, go to the next step. Otherwise, increase pointer by 1 and continue with the state machine.
-            if (pointer == length) {
+            if (i == length) {
                 if (state == .fragment) break;
                 state = @enumFromInt(@intFromEnum(state) + 1);
             } else {
@@ -1322,7 +1324,7 @@ fn lastcpi(haystack: []const u8) usize {
     return i;
 }
 fn percentEncodeScalarAL(list: *std.ArrayList(u8), cp: []const u8, comptime set: fn (u8) bool) !void {
-    if (!set(cp[0])) {
+    if (set(cp[0])) {
         for (cp) |b| {
             try list.append('%');
             try list.writer().print("{d:0<2}", .{b});
@@ -1334,7 +1336,7 @@ fn percentEncodeScalarAL(list: *std.ArrayList(u8), cp: []const u8, comptime set:
 fn percentEncodeAL(list: *std.ArrayList(u8), input: []const u8, comptime set: fn (u8) bool) !void {
     var it = std.unicode.Utf8View.initUnchecked(input).iterator();
     while (it.nextCodepointSlice()) |sl| {
-        if (!set(sl[0])) {
+        if (set(sl[0])) {
             for (sl) |b| {
                 try list.append('%');
                 try list.writer().print("{d:0<2}", .{b});
