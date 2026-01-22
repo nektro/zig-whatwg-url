@@ -4,6 +4,7 @@ import casesidna from "./IdnaTestV2.json";
 const cases = casesraw.filter((v) => typeof v !== "string");
 const f = Bun.file(process.argv[2]!);
 const w = f.writer();
+const encoder = new TextEncoder();
 
 w.write(`const std = @import("std");\n`);
 w.write(`const url = @import("url");\n`);
@@ -13,21 +14,20 @@ w.write(`// zig fmt: off\n`);
 
 function stringEscape(s?: string) {
   if (!s) return "";
-  return s
-    .split("")
+  return Array.from(encoder.encode(s.replace(/\\u([0-9A-F]{4})/g, (s) => String.fromCodePoint(parseInt(s.slice(2), 16)))))
     .map((x) => {
-      if (x === "\n") return "\\n";
-      if (x === "\r") return "\\r";
-      if (x === "\t") return "\\t";
-      if (x === "\\") return "\\\\";
-      if (x === '"') return `\\"`;
-      if (x === "'") return x;
-      if (x === " ") return x;
-      if (x === "!") return x;
-      if (x.codePointAt(0)! >= "#".codePointAt(0)! && x.codePointAt(0)! <= "&".codePointAt(0)!) return x;
-      if (x.codePointAt(0)! >= "(".codePointAt(0)! && x.codePointAt(0)! <= "[".codePointAt(0)!) return x;
-      if (x.codePointAt(0)! >= "]".codePointAt(0)! && x.codePointAt(0)! <= "~".codePointAt(0)!) return x;
-      return `\\x${x.codePointAt(0)!.toString(16).padStart(2, "0")}`;
+      if (x === 0x09) return "\\t";
+      if (x === 0x0a) return "\\n";
+      if (x === 0x0d) return "\\r";
+      if (x === 0x20) return " ";
+      if (x === 0x21) return "!";
+      if (x === 0x22) return `\\"`;
+      if (x >= 0x23 && x <= 0x26) return String.fromCodePoint(x);
+      if (x === 0x27) return "'";
+      if (x >= 0x28 && x <= 0x5b) return String.fromCodePoint(x);
+      if (x === 0x5c) return "\\\\";
+      if (x >= 0x5d && x <= 0x7e) return String.fromCodePoint(x);
+      return `\\x${x.toString(16).padStart(2, "0")}`;
     })
     .join("");
 }
