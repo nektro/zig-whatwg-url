@@ -60,10 +60,13 @@ pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin:
     _ = hash;
 }
 
-pub fn parseIDNAFail(input: []const u8) !void {
-    _ = input;
-    // new URL('https://{idnaTest.input}/x')
-    return error.SkipZigTest;
+pub fn parseIDNAFail(comptime input: []const u8) !void {
+    const allocator = std.testing.allocator;
+    _ = url.URL.parse(allocator, "https://" ++ input ++ "/x", null) catch |err| switch (err) {
+        error.SkipZigTest => |e| return e,
+        else => return,
+    };
+    return error.FailZigTest;
 }
 
 pub fn parseIDNAPass(input: []const u8, output: []const u8) !void {
@@ -103,16 +106,14 @@ for (const c of cases.filter((v) => v.base != null && !v.failure)) {
 }
 
 w.write(`\n`);
-// prettier-ignore
-if (false)
-for (const c of casesidna.filter((v) => typeof v !== "string").filter((v) => !v.output)) {
+for (const c of casesidna.filter((v) => typeof v !== "string").filter((v) => v.output === null)) {
   w.write(`test { try parseIDNAFail("${stringEscape(c.input)}"); }\n`);
 }
 
 w.write(`\n`);
 // prettier-ignore
 if (false)
-for (const c of casesidna.filter((v) => typeof v !== "string").filter((v) => !!v.output)) {
+for (const c of casesidna.filter((v) => typeof v !== "string").filter((v) => v.output !== null)) {
   w.write(`test { try parseIDNAPass("${stringEscape(c.input)}", "${stringEscape(c.output!)}"); }\n`);
 }
 
