@@ -49,7 +49,7 @@ pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin:
     defer allocator.free(u.href);
     _ = href;
     _ = origin;
-    _ = protocol;
+    try expect(u.protocol).toEqualString(protocol);
     _ = username;
     _ = password;
     _ = host;

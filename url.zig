@@ -7,6 +7,7 @@ const unicode_idna = @import("unicode-idna");
 pub const URL = struct {
     href: []const u8,
     scheme: []const u8 = "",
+    protocol: []const u8,
 
     pub const HostKind = enum {
         name,
@@ -75,23 +76,27 @@ pub const URL = struct {
         // inputl[i], must change in tandem with i
         var c: u8 = if (length > 0) inputl.items[i] else 0;
 
-        var href = std.ArrayList(u8).init(alloc);
+        var href = ManyArrayList(8 + 7, u8).init(alloc);
         defer href.deinit();
-
-        var scheme = std.ArrayList(u8).init(alloc);
-        defer scheme.deinit();
+        // :
+        // //
         var username = std.ArrayList(u8).init(alloc);
         defer username.deinit();
+        // :
         var password = std.ArrayList(u8).init(alloc);
         defer password.deinit();
+        // @
         var host: Host = .{ .name = "" };
         defer if (host == .name) alloc.free(host.name);
+        // :
         var port = std.ArrayList(u8).init(alloc);
         defer port.deinit();
         var path = std.ArrayList(u8).init(alloc);
         defer path.deinit();
+        // ?
         var query = std.ArrayList(u8).init(alloc);
         defer query.deinit();
+        // #
         var fragment = std.ArrayList(u8).init(alloc);
         defer fragment.deinit();
 
@@ -122,6 +127,7 @@ pub const URL = struct {
                     }
                     // 2. Otherwise, if c is U+003A (:), then:
                     else if (c == ':') {
+                        try href.set(1, ":");
                         // 1. If state override is given, then:
                         if (state_override != null) {
                             @panic("TODO");
@@ -131,8 +137,7 @@ pub const URL = struct {
                             // 4. If url’s scheme is "file" and its host is an empty host, then return.
                         }
                         // 2. Set url’s scheme to buffer.
-                        scheme.clearRetainingCapacity();
-                        try scheme.appendSlice(buffer.items);
+                        try href.set(0, buffer.items);
                         // 3. If state override is given, then:
                         if (state_override != null) {
                             @panic("TODO");
@@ -142,20 +147,20 @@ pub const URL = struct {
                         // 4. Set buffer to the empty string.
                         buffer.clearRetainingCapacity();
                         // 5. If url’s scheme is "file", then:
-                        if (std.mem.eql(u8, scheme.items, "file")) {
+                        if (std.mem.eql(u8, href.items(0), "file")) {
                             // 1. If remaining does not start with "//", special-scheme-missing-following-solidus validation error.
                             {}
                             // 2. Set state to file state.
                             state = .file;
                         }
                         // 6. Otherwise, if url is special, base is non-null, and base’s scheme is url’s scheme:
-                        else if (isSchemeSpecial(scheme.items) and base != null and std.mem.eql(u8, base.?.scheme, scheme.items)) {
+                        else if (isSchemeSpecial(href.items(0)) and base != null and std.mem.eql(u8, base.?.scheme, href.items(0))) {
                             @panic("TODO");
                             // 1. Assert: base is special (and therefore does not have an opaque path).
                             // 2. Set state to special relative or authority state.
                         }
                         // 7. Otherwise, if url is special, set state to special authority slashes state.
-                        else if (isSchemeSpecial(scheme.items)) {
+                        else if (isSchemeSpecial(href.items(0))) {
                             state = .special_authority_slashes;
                         }
                         // 8. Otherwise, if remaining starts with an U+002F (/), set state to path or authority state and increase pointer by 1.
@@ -223,13 +228,13 @@ pub const URL = struct {
                     // 1. Assert: base’s scheme is not "file".
                     std.debug.assert(!std.mem.eql(u8, base.?.scheme, "file"));
                     // 2. Set url’s scheme to base’s scheme.
-                    try scheme.appendSlice(base.?.scheme);
+                    try href.set(0, base.?.scheme);
                     // 3. If c is U+002F (/), then set state to relative slash state.
                     if (c == '/') {
                         state = .relative_slash;
                     }
                     // 4. Otherwise, if url is special and c is U+005C (\), invalid-reverse-solidus validation error, set state to relative slash state.
-                    else if (isSchemeSpecial(scheme.items) and c == '\\') {
+                    else if (isSchemeSpecial(href.items(0)) and c == '\\') {
                         state = .relative_slash;
                     }
                     // 5. Otherwise:
@@ -267,7 +272,7 @@ pub const URL = struct {
                 },
                 .relative_slash => {
                     // 1. If url is special and c is U+002F (/) or U+005C (\), then:
-                    if (isSchemeSpecial(scheme.items) and (c == '/' or c == '\\')) {
+                    if (isSchemeSpecial(href.items(0)) and (c == '/' or c == '\\')) {
                         // 1. If c is U+005C (\), invalid-reverse-solidus validation error.
                         // 2. Set state to special authority ignore slashes state.
                         state = .special_authority_ignore_slashes;
@@ -340,7 +345,7 @@ pub const URL = struct {
                     //      - c is the EOF code point, U+002F (/), U+003F (?), or U+0023 (#)
                     //      - url is special and c is U+005C (\)
                     // then:
-                    else if ((i == length or c == '/' or c == '?' or c == '#') or (isSchemeSpecial(scheme.items) and c == '\\')) {
+                    else if ((i == length or c == '/' or c == '?' or c == '#') or (isSchemeSpecial(href.items(0)) and c == '\\')) {
                         // 1. If atSignSeen is true and buffer is the empty string, host-missing validation error, return failure.
                         if (atSignSeen and buffer.items.len == 0) return error.InvalidURL;
                         // 2. Decrease pointer by buffer’s code point length + 1, set buffer to the empty string, and set state to host state.
@@ -359,7 +364,7 @@ pub const URL = struct {
                 },
                 .host, .hostname => {
                     // 1. If state override is given and url’s scheme is "file", then decrease pointer by 1 and set state to file host state.
-                    if (state_override != null and std.mem.eql(u8, scheme.items, "file")) {
+                    if (state_override != null and std.mem.eql(u8, href.items(0), "file")) {
                         pointer -= 1;
                         i = lastcpi(inputl.items[0..i]);
                         c = inputl.items[i];
@@ -373,7 +378,7 @@ pub const URL = struct {
                         if (state_override != null and state_override.? == .hostname) return error.InvalidURL;
                         // 3. Let host be the result of host parsing buffer with url is not special.
                         // 4. If host is failure, then return failure.
-                        const h = try parseHost(alloc, buffer.items, !isSchemeSpecial(scheme.items));
+                        const h = try parseHost(alloc, buffer.items, !isSchemeSpecial(href.items(0)));
                         // 5. Set url’s host to host, buffer to the empty string, and state to port state.
                         host = h;
                         buffer.clearRetainingCapacity();
@@ -383,17 +388,17 @@ pub const URL = struct {
                     //  - c is the EOF code point, U+002F (/), U+003F (?), or U+0023 (#)
                     //  - url is special and c is U+005C (\)
                     // then decrease pointer by 1, and:
-                    else if ((i == length or c == '/' or c == '?' or c == '#') or (isSchemeSpecial(scheme.items) and c == '\\')) {
+                    else if ((i == length or c == '/' or c == '?' or c == '#') or (isSchemeSpecial(href.items(0)) and c == '\\')) {
                         pointer -= 1;
                         i = lastcpi(inputl.items[0..i]);
                         c = inputl.items[i];
                         // 1. If url is special and buffer is the empty string, host-missing validation error, return failure.
-                        if (isSchemeSpecial(scheme.items) and buffer.items.len == 0) return error.InvalidURL
+                        if (isSchemeSpecial(href.items(0)) and buffer.items.len == 0) return error.InvalidURL
                         // 2. Otherwise, if state override is given, buffer is the empty string, and either url includes credentials or url’s port is non-null, then return failure.
                         else if (state_override != null and buffer.items.len == 0 and (username.items.len > 0 or password.items.len > 0)) return error.InvalidURL;
                         // 3. Let host be the result of host parsing buffer with url is not special.
                         // 4. If host is failure, then return failure.
-                        const h = try parseHost(alloc, buffer.items, !isSchemeSpecial(scheme.items));
+                        const h = try parseHost(alloc, buffer.items, !isSchemeSpecial(href.items(0)));
                         // 5. Set url’s host to host, buffer to the empty string, and state to path start state.
                         host = h;
                         buffer.clearRetainingCapacity();
@@ -421,14 +426,14 @@ pub const URL = struct {
                     //  - url is special and c is U+005C (\); or
                     //  - state override is given,
                     // then:
-                    else if ((i == length or c == '/' or c == '?' or c == '#') or (isSchemeSpecial(scheme.items) and c == '\\') or (state_override != null)) {
+                    else if ((i == length or c == '/' or c == '?' or c == '#') or (isSchemeSpecial(href.items(0)) and c == '\\') or (state_override != null)) {
                         // 1. If buffer is not the empty string:
                         if (buffer.items.len > 0) {
                             // 1. Let port be the mathematical integer value that is represented by buffer in radix-10 using ASCII digits for digits with values 0 through 9.
                             // 2. If port is not a 16-bit unsigned integer, port-out-of-range validation error, return failure.
                             const p = std.fmt.parseInt(u16, buffer.items, 10) catch return error.InvalidURL;
                             // 3. Set url’s port to null, if port is url’s scheme’s default port; otherwise to port.
-                            if (schemeDefaultPort(scheme.items) != p) try port.writer().print("{d}", .{p});
+                            if (schemeDefaultPort(href.items(0)) != p) try port.writer().print("{d}", .{p});
                             // 4. Set buffer to the empty string.
                             buffer.clearRetainingCapacity();
                             // 5. If state override is given, then return.
@@ -449,8 +454,7 @@ pub const URL = struct {
                 },
                 .file => {
                     // 1. Set url’s scheme to "file".
-                    scheme.clearRetainingCapacity();
-                    try scheme.appendSlice("file");
+                    try href.set(0, "file");
                     // 2. Set url’s host to the empty string.
                     host = .{ .name = "" };
                     // 3. If c is U+002F (/) or U+005C (\), then:
@@ -552,7 +556,7 @@ pub const URL = struct {
                         else {
                             // 1. Let host be the result of host parsing buffer with url is not special.
                             // 2. If host is failure, then return failure.
-                            var h = try parseHost(alloc, buffer.items, !isSchemeSpecial(scheme.items));
+                            var h = try parseHost(alloc, buffer.items, !isSchemeSpecial(href.items(0)));
                             // 3. If host is "localhost", then set host to the empty string.
                             if (h == .name and std.mem.eql(u8, h.name, "localhost")) {
                                 alloc.free(h.name);
@@ -572,7 +576,7 @@ pub const URL = struct {
                 },
                 .path_start => {
                     // 1. If url is special, then:
-                    if (isSchemeSpecial(scheme.items)) {
+                    if (isSchemeSpecial(href.items(0))) {
                         // 1. If c is U+005C (\), invalid-reverse-solidus validation error.
                         {}
                         // 2. Set state to path state.
@@ -616,7 +620,7 @@ pub const URL = struct {
                     //  - url is special and c is U+005C (\)
                     //  - state override is not given and c is U+003F (?) or U+0023 (#)
                     // then:
-                    if ((i == length or c == '/') or (isSchemeSpecial(scheme.items) and c == '\\') or (state_override == null and (c == '?' or c == '#'))) {
+                    if ((i == length or c == '/') or (isSchemeSpecial(href.items(0)) and c == '\\') or (state_override == null and (c == '?' or c == '#'))) {
                         // 1. If url is special and c is U+005C (\), invalid-reverse-solidus validation error.
                         {}
                         // 2. If buffer is a double-dot URL path segment, then:
@@ -627,14 +631,14 @@ pub const URL = struct {
                             // > This means that for input /usr/.. the result is / and not a lack of a path.
                         }
                         // 3. Otherwise, if buffer is a single-dot URL path segment and if neither c is U+002F (/), nor url is special and c is U+005C (\), append the empty string to url’s path.
-                        else if (isSingleDotPathSeg(buffer.items) and (c != '/' or !(isSchemeSpecial(scheme.items) and c == '\\'))) {
+                        else if (isSingleDotPathSeg(buffer.items) and (c != '/' or !(isSchemeSpecial(href.items(0)) and c == '\\'))) {
                             // @panic("TODO");
                         }
                         // 4. Otherwise, if buffer is not a single-dot URL path segment, then:
                         else if (!isSingleDotPathSeg(buffer.items)) {
                             // 1. If url’s scheme is "file", url’s path is empty, and buffer is a Windows drive letter, then replace the second code point in buffer with U+003A (:).
                             // > This is a (platform-independent) Windows drive letter quirk.
-                            if (std.mem.eql(u8, scheme.items, "file") and path.items.len == 0 and isWindowsDriveLetter(buffer.items)) {
+                            if (std.mem.eql(u8, href.items(0), "file") and path.items.len == 0 and isWindowsDriveLetter(buffer.items)) {
                                 buffer.items[1] = ':';
                             }
                             // 2. Append buffer to url’s path.
@@ -715,7 +719,7 @@ pub const URL = struct {
                         // 1. Let queryPercentEncodeSet be the special-query percent-encode set if url is special; otherwise the query percent-encode set.
                         // 2. Percent-encode after encoding, with encoding, buffer, and queryPercentEncodeSet, and append the result to url’s query.
                         // > This operation cannot be invoked code-point-for-code-point due to the stateful ISO-2022-JP encoder.
-                        if (isSchemeSpecial(scheme.items)) {
+                        if (isSchemeSpecial(href.items(0))) {
                             try percentEncodeAL(&query, buffer.items, is_special_query_percent_char);
                         } else {
                             try percentEncodeAL(&query, buffer.items, is_query_percent_char);
@@ -762,10 +766,11 @@ pub const URL = struct {
             }
         }
 
-        const _href = try href.toOwnedSlice();
+        const _href = try href.list.toOwnedSlice();
 
         const url: URL = .{
             .href = _href,
+            .protocol = _href[0..extras.sum(usize, href.lengths[0..2])],
         };
         return url;
     }
@@ -1375,4 +1380,34 @@ fn percentEncodeAL(list: *std.ArrayList(u8), input: []const u8, comptime set: fn
             try list.appendSlice(sl);
         }
     }
+}
+
+pub fn ManyArrayList(N: usize, T: type) type {
+    return struct {
+        list: std.ArrayList(T),
+        lengths: [N]usize,
+
+        pub fn init(allocator: std.mem.Allocator) @This() {
+            return .{
+                .list = .init(allocator),
+                .lengths = @splat(0),
+            };
+        }
+
+        pub fn deinit(self: *@This()) void {
+            self.list.deinit();
+        }
+
+        pub fn set(self: *@This(), n: usize, slice: []const T) !void {
+            const real_n = extras.sum(usize, self.lengths[0..n]);
+            try self.list.replaceRange(real_n, self.lengths[n], slice);
+            self.lengths[n] = slice.len;
+        }
+
+        pub fn items(self: *@This(), n: usize) []T {
+            const real_n = extras.sum(usize, self.lengths[0..n]);
+            const len = self.lengths[n];
+            return self.list.items[real_n..][0..len];
+        }
+    };
 }
