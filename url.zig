@@ -536,8 +536,8 @@ pub const URL = struct {
                         c = inputl.items[i];
                         // 1. If state override is not given and buffer is a Windows drive letter, file-invalid-Windows-drive-letter-host validation error, set state to path state.
                         // > This is a (platform-independent) Windows drive letter quirk. buffer is not reset here and instead used in the path state.
-                        if (builtin.target.os.tag == .windows) {
-                            @compileError("TODO");
+                        if (state_override == null and isWindowsDriveLetter(buffer.items)) {
+                            state = .path;
                         }
                         // 2. Otherwise, if buffer is the empty string, then:
                         else if (buffer.items.len == 0) {
@@ -631,10 +631,12 @@ pub const URL = struct {
                             // @panic("TODO");
                         }
                         // 4. Otherwise, if buffer is not a single-dot URL path segment, then:
-                        else if (isSingleDotPathSeg(buffer.items)) {
+                        else if (!isSingleDotPathSeg(buffer.items)) {
                             // 1. If url’s scheme is "file", url’s path is empty, and buffer is a Windows drive letter, then replace the second code point in buffer with U+003A (:).
                             // > This is a (platform-independent) Windows drive letter quirk.
-                            if (builtin.target.os.tag == .windows) @compileError("TODO");
+                            if (std.mem.eql(u8, scheme.items, "file") and path.items.len == 0 and isWindowsDriveLetter(buffer.items)) {
+                                buffer.items[1] = ':';
+                            }
                             // 2. Append buffer to url’s path.
                             try path.appendSlice(buffer.items);
                         }
@@ -833,6 +835,14 @@ fn isSingleDotPathSeg(segment: []const u8) bool {
     if (std.mem.eql(u8, segment, ".")) return true;
     if (std.ascii.eqlIgnoreCase(segment, "%2e")) return true;
     return false;
+}
+
+/// https://url.spec.whatwg.org/#windows-drive-letter
+fn isWindowsDriveLetter(buffer: []const u8) bool {
+    if (buffer.len != 2) return false;
+    if (!std.ascii.isAlphabetic(buffer[0])) return false;
+    if (!(buffer[1] == ':' or buffer[1] == '|')) return false;
+    return true;
 }
 
 /// https://url.spec.whatwg.org/#concept-host-parser
