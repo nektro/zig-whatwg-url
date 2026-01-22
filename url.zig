@@ -27,9 +27,9 @@ pub const URL = struct {
     }
 
     /// https://url.spec.whatwg.org/#concept-basic-url-parser
-    fn parseBasic(alloc: std.mem.Allocator, input: []const u8, base: ?URL, state_override: ?BasicParserState) error{ SkipZigTest, InvalidURL, OutOfMemory }!URL {
+    fn parseBasic(alloc: std.mem.Allocator, input: []const u8, base: ?URL, state_override: ?BasicParserState) error{ InvalidURL, OutOfMemory }!URL {
         // input is a scalar value string
-        if (!std.unicode.utf8ValidateSlice(input)) return error.SkipZigTest;
+        if (!std.unicode.utf8ValidateSlice(input)) return error.InvalidURL;
 
         var inputl = std.ArrayList(u8).init(alloc);
         defer inputl.deinit();
@@ -190,7 +190,7 @@ pub const URL = struct {
                     // 2. Otherwise, if base has an opaque path and c is U+0023 (#), set url’s scheme to base’s scheme, url’s path to base’s path, url’s query to base’s query, url’s fragment to the empty string, and set state to fragment state.
                     // 3. Otherwise, if base’s scheme is not "file", set state to relative state and decrease pointer by 1.
                     // 4. Otherwise, set state to file state and decrease pointer by 1.
-                    return error.SkipZigTest;
+                    return error.InvalidURL;
                 },
                 .special_relative_or_authority => {
                     // 1. If c is U+002F (/) and remaining starts with U+002F (/), then set state to special authority ignore slashes state and increase pointer by 1.

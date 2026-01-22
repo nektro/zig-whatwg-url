@@ -37,8 +37,8 @@ w.write(`
 pub fn parseFail(input: []const u8, base: ?[]const u8) !void {
     const allocator = std.testing.allocator;
     _ = url.URL.parse(allocator, input, base) catch |err| switch (err) {
-        error.SkipZigTest => |e| return e,
-        else => return,
+        error.InvalidURL => return,
+        error.OutOfMemory => return error.OutOfMemory,
     };
     return error.FailZigTest;
 }
@@ -63,21 +63,22 @@ pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin:
 pub fn parseIDNAFail(comptime input: []const u8) !void {
     const allocator = std.testing.allocator;
     _ = url.URL.parse(allocator, "https://" ++ input ++ "/x", null) catch |err| switch (err) {
-        error.SkipZigTest => |e| return e,
-        else => return,
+        error.InvalidURL => return,
+        error.OutOfMemory => return error.OutOfMemory,
     };
     return error.FailZigTest;
 }
 
-pub fn parseIDNAPass(input: []const u8, output: []const u8) !void {
-    _ = input;
+pub fn parseIDNAPass(comptime input: []const u8, comptime output: []const u8) !void {
     _ = output;
     // new URL('https://{idnaTest.input}/x');
+    const allocator = std.testing.allocator;
+    const u = try url.URL.parse(allocator, "https://" ++ input ++ "/x", null);
+    defer allocator.free(u.href);
     // assert_equals(url.host, idnaTest.output);
     // assert_equals(url.hostname, idnaTest.output);
     // assert_equals(url.pathname, "/x");
     // assert_equals(url.href, 'https://{idnaTest.output}/x');
-    return error.SkipZigTest;
 }
 `);
 
@@ -111,8 +112,6 @@ for (const c of casesidna.filter((v) => typeof v !== "string").filter((v) => v.o
 }
 
 w.write(`\n`);
-// prettier-ignore
-if (false)
 for (const c of casesidna.filter((v) => typeof v !== "string").filter((v) => v.output !== null)) {
   w.write(`test { try parseIDNAPass("${stringEscape(c.input)}", "${stringEscape(c.output!)}"); }\n`);
 }
