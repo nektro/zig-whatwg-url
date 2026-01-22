@@ -6,5 +6,6 @@ description: A WHATWG URL-compatible parser for Zig
 dependencies:
   - src: git https://github.com/nektro/zig-net
   - src: git https://github.com/nektro/zig-extras
+  - src: git https://github.com/nektro/zig-unicode-idna
 root_dependencies:
   - src: git https://github.com/nektro/zig-expect

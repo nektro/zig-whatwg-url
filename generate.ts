@@ -1,4 +1,3 @@
-import { closeSync, openSync } from "node:fs";
 import casesraw from "./urltestdata.json";
 import casesidna from "./IdnaTestV2.json";
 

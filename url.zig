@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const net = @import("net");
 const extras = @import("extras");
+const unicode_idna = @import("unicode-idna");
 
 pub const URL = struct {
     href: []const u8,
@@ -448,6 +449,7 @@ pub const URL = struct {
                 },
                 .file => {
                     // 1. Set url’s scheme to "file".
+                    scheme.clearRetainingCapacity();
                     try scheme.appendSlice("file");
                     // 2. Set url’s host to the empty string.
                     host = .{ .name = "" };
@@ -1057,9 +1059,11 @@ fn percentDecode(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
 }
 
 /// https://url.spec.whatwg.org/#concept-domain-to-ascii
-// TODO:
 fn domainToAscii(allocator: std.mem.Allocator, domain: []const u8, beStrict: bool) ![]u8 {
-    const result = try allocator.dupe(u8, domain);
+    const result = unicode_idna.ToASCII(allocator, domain, beStrict, true, true, beStrict, false, beStrict, false) catch |err| switch (err) {
+        error.IDNAFailure => return error.InvalidURL,
+        error.OutOfMemory => return error.OutOfMemory,
+    };
     errdefer allocator.free(result);
     if (!beStrict) {
         if (result.len == 0) return error.InvalidURL;
