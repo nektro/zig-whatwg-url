@@ -78,27 +78,22 @@ pub const URL = struct {
 
         var href = ManyArrayList(8 + 7, u8).init(alloc);
         defer href.deinit();
+        // scheme
         // :
         // //
-        var username = std.ArrayList(u8).init(alloc);
-        defer username.deinit();
+        // username
         // :
-        var password = std.ArrayList(u8).init(alloc);
-        defer password.deinit();
+        // password
         // @
         var host: Host = .{ .name = "" };
         defer if (host == .name) alloc.free(host.name);
         // :
-        var port = std.ArrayList(u8).init(alloc);
-        defer port.deinit();
-        var path = std.ArrayList(u8).init(alloc);
-        defer path.deinit();
+        // port
+        // path
         // ?
-        var query = std.ArrayList(u8).init(alloc);
-        defer query.deinit();
+        // query
         // #
-        var fragment = std.ArrayList(u8).init(alloc);
-        defer fragment.deinit();
+        // fragment
 
         // 9.
         while (true) {
@@ -172,7 +167,7 @@ pub const URL = struct {
                         }
                         // 9. Otherwise, set url’s path to the empty string and set state to opaque path state.
                         else {
-                            path.clearRetainingCapacity();
+                            href.clear(10);
                             state = .opaque_path;
                         }
                     }
@@ -248,18 +243,18 @@ pub const URL = struct {
                         // try query.appendSlice(base.?.query.?);
                         // 2. If c is U+003F (?), then set url’s query to the empty string, and state to query state.
                         if (c == '?') {
-                            query.clearRetainingCapacity();
+                            href.clear(12);
                             state = .query;
                         }
                         // 3. Otherwise, if c is U+0023 (#), set url’s fragment to the empty string and state to fragment state.
                         else if (c == '#') {
-                            fragment.clearRetainingCapacity();
+                            href.clear(14);
                             state = .fragment;
                         }
                         // 4. Otherwise, if c is not the EOF code point:
                         else if (i < length) {
                             // 1. Set url’s query to null.
-                            query.clearRetainingCapacity();
+                            href.clear(12);
                             // 2. Shorten url’s path.
                             @panic("TODO");
                             // 3. Set state to path state and decrease pointer by 1.
@@ -380,6 +375,7 @@ pub const URL = struct {
                         // 4. If host is failure, then return failure.
                         const h = try parseHost(alloc, buffer.items, !isSchemeSpecial(href.items(0)));
                         // 5. Set url’s host to host, buffer to the empty string, and state to port state.
+                        // try href.set(7, h);
                         host = h;
                         buffer.clearRetainingCapacity();
                         state = .port;
@@ -395,11 +391,12 @@ pub const URL = struct {
                         // 1. If url is special and buffer is the empty string, host-missing validation error, return failure.
                         if (isSchemeSpecial(href.items(0)) and buffer.items.len == 0) return error.InvalidURL
                         // 2. Otherwise, if state override is given, buffer is the empty string, and either url includes credentials or url’s port is non-null, then return failure.
-                        else if (state_override != null and buffer.items.len == 0 and (username.items.len > 0 or password.items.len > 0)) return error.InvalidURL;
+                        else if (state_override != null and buffer.items.len == 0 and (href.items(3).len > 0 or href.items(5).len > 0)) return error.InvalidURL;
                         // 3. Let host be the result of host parsing buffer with url is not special.
                         // 4. If host is failure, then return failure.
                         const h = try parseHost(alloc, buffer.items, !isSchemeSpecial(href.items(0)));
                         // 5. Set url’s host to host, buffer to the empty string, and state to path start state.
+                        // try href.set(7, h);
                         host = h;
                         buffer.clearRetainingCapacity();
                         state = .path_start;
@@ -433,7 +430,7 @@ pub const URL = struct {
                             // 2. If port is not a 16-bit unsigned integer, port-out-of-range validation error, return failure.
                             const p = std.fmt.parseInt(u16, buffer.items, 10) catch return error.InvalidURL;
                             // 3. Set url’s port to null, if port is url’s scheme’s default port; otherwise to port.
-                            if (schemeDefaultPort(href.items(0)) != p) try port.writer().print("{d}", .{p});
+                            if (schemeDefaultPort(href.items(0)) != p) try href.print(9, "{d}", .{p});
                             // 4. Set buffer to the empty string.
                             buffer.clearRetainingCapacity();
                             // 5. If state override is given, then return.
@@ -456,7 +453,7 @@ pub const URL = struct {
                     // 1. Set url’s scheme to "file".
                     try href.set(0, "file");
                     // 2. Set url’s host to the empty string.
-                    host = .{ .name = "" };
+                    href.clear(7);
                     // 3. If c is U+002F (/) or U+005C (\), then:
                     if (c == '/' or c == '\\') {
                         // 1. If c is U+005C (\), invalid-reverse-solidus validation error.
@@ -472,18 +469,18 @@ pub const URL = struct {
                         // try query.appendSlice(base.?.query.?);
                         // 2. If c is U+003F (?), then set url’s query to the empty string and state to query state.
                         if (c == '?') {
-                            query.clearRetainingCapacity();
+                            href.clear(12);
                             state = .query;
                         }
                         // 3. Otherwise, if c is U+0023 (#), set url’s fragment to the empty string and state to fragment state.
                         else if (c == '#') {
-                            fragment.clearRetainingCapacity();
+                            href.clear(14);
                             state = .fragment;
                         }
                         // 4. Otherwise, if c is not the EOF code point:
                         else if (i < length) {
                             // 1. Set url’s query to null.
-                            query.clearRetainingCapacity();
+                            href.clear(12);
                             // 2. If the code point substring from pointer to the end of input does not start with a Windows drive letter, then shorten url’s path.
                             // 3. Otherwise:
                             // This is a (platform-independent) Windows drive letter quirk.
@@ -546,7 +543,7 @@ pub const URL = struct {
                         // 2. Otherwise, if buffer is the empty string, then:
                         else if (buffer.items.len == 0) {
                             // 1. Set url’s host to the empty string.
-                            host = .{ .name = "" };
+                            href.clear(7);
                             // 2. If state override is given, then return.
                             if (state_override != null) break;
                             // 3. Set state to path start state.
@@ -563,6 +560,7 @@ pub const URL = struct {
                                 h = .{ .name = "" };
                             }
                             // 4. Set url’s host to host.
+                            // try href.set(7, h);
                             host = h;
                             // 5. If state override is given, then return.
                             if (state_override != null) break;
@@ -590,12 +588,12 @@ pub const URL = struct {
                     }
                     // 2. Otherwise, if state override is not given and c is U+003F (?), set url’s query to the empty string and state to query state.
                     else if (state_override == null and c == '?') {
-                        query.clearRetainingCapacity();
+                        href.clear(12);
                         state = .query;
                     }
                     // 3. Otherwise, if state override is not given and c is U+0023 (#), set url’s fragment to the empty string and state to fragment state.
                     else if (state_override == null and c == '#') {
-                        fragment.clearRetainingCapacity();
+                        href.clear(14);
                         state = .fragment;
                     }
                     // 4. Otherwise, if c is not the EOF code point:
@@ -638,22 +636,22 @@ pub const URL = struct {
                         else if (!isSingleDotPathSeg(buffer.items)) {
                             // 1. If url’s scheme is "file", url’s path is empty, and buffer is a Windows drive letter, then replace the second code point in buffer with U+003A (:).
                             // > This is a (platform-independent) Windows drive letter quirk.
-                            if (std.mem.eql(u8, href.items(0), "file") and path.items.len == 0 and isWindowsDriveLetter(buffer.items)) {
+                            if (std.mem.eql(u8, href.items(0), "file") and href.items(10).len == 0 and isWindowsDriveLetter(buffer.items)) {
                                 buffer.items[1] = ':';
                             }
                             // 2. Append buffer to url’s path.
-                            try path.appendSlice(buffer.items);
+                            try href.appendSlice(10, buffer.items);
                         }
                         // 5. Set buffer to the empty string.
                         buffer.clearRetainingCapacity();
                         // 6. If c is U+003F (?), then set url’s query to the empty string and state to query state.
                         if (c == '?') {
-                            query.clearRetainingCapacity();
+                            href.clear(12);
                             state = .query;
                         }
                         // 7. If c is U+0023 (#), then set url’s fragment to the empty string and state to fragment state.
                         if (c == '#') {
-                            fragment.clearRetainingCapacity();
+                            href.clear(14);
                             state = .fragment;
                         }
                     }
@@ -676,12 +674,12 @@ pub const URL = struct {
                 .opaque_path => {
                     // 1. If c is U+003F (?), then set url’s query to the empty string and state to query state.
                     if (c == '?') {
-                        query.clearRetainingCapacity();
+                        href.clear(12);
                         state = .query;
                     }
                     // 2. Otherwise, if c is U+0023 (#), then set url’s fragment to the empty string and state to fragment state.
                     else if (c == '#') {
-                        fragment.clearRetainingCapacity();
+                        href.clear(14);
                         state = .fragment;
                     }
                     // 3. Otherwise, if c is U+0020 SPACE:
@@ -689,11 +687,11 @@ pub const URL = struct {
                         // 1. If remaining starts with U+003F (?) or U+003F (#), then append "%20" to url’s path.
                         const rem = inputl.items[i + l(c) ..];
                         if (std.mem.startsWith(u8, rem, "?") or std.mem.startsWith(u8, rem, "#")) {
-                            try path.appendSlice("%20");
+                            try href.appendSlice(10, "%20");
                         }
                         // 2. Otherwise, append U+0020 SPACE to url’s path.
                         else {
-                            try path.append(' ');
+                            try href.appendSlice(10, " ");
                         }
                     }
                     // 4. Otherwise, if c is not the EOF code point:
@@ -703,7 +701,7 @@ pub const URL = struct {
                         // 2. If c is U+0025 (%) and remaining does not start with two ASCII hex digits, invalid-URL-unit validation error.
                         {}
                         // 3. UTF-8 percent-encode c using the C0 control percent-encode set and append the result to url’s path.
-                        try percentEncodeScalarAL(&path, inputl.items[i..][0..l(c)], is_c0control_percent_char);
+                        try percentEncodeScalarML(&href, 10, inputl.items[i..][0..l(c)], is_c0control_percent_char);
                     }
                 },
                 .query => {
@@ -720,15 +718,15 @@ pub const URL = struct {
                         // 2. Percent-encode after encoding, with encoding, buffer, and queryPercentEncodeSet, and append the result to url’s query.
                         // > This operation cannot be invoked code-point-for-code-point due to the stateful ISO-2022-JP encoder.
                         if (isSchemeSpecial(href.items(0))) {
-                            try percentEncodeAL(&query, buffer.items, is_special_query_percent_char);
+                            try percentEncodeML(&href, 12, buffer.items, is_special_query_percent_char);
                         } else {
-                            try percentEncodeAL(&query, buffer.items, is_query_percent_char);
+                            try percentEncodeML(&href, 12, buffer.items, is_query_percent_char);
                         }
                         // 3. Set buffer to the empty string.
                         buffer.clearRetainingCapacity();
                         // 4. If c is U+0023 (#), then set url’s fragment to the empty string and state to fragment state.
                         if (c == '#') {
-                            fragment.clearRetainingCapacity();
+                            href.clear(14);
                             state = .fragment;
                         }
                     }
@@ -750,7 +748,7 @@ pub const URL = struct {
                         // 2. If c is U+0025 (%) and remaining does not start with two ASCII hex digits, invalid-URL-unit validation error.
                         {}
                         // 3. UTF-8 percent-encode c using the fragment percent-encode set and append the result to url’s fragment.
-                        try percentEncodeScalarAL(&fragment, inputl.items[i..][0..l(c)], is_fragment_percent_char);
+                        try percentEncodeScalarML(&href, 14, inputl.items[i..][0..l(c)], is_fragment_percent_char);
                     }
                 },
             }
@@ -1381,6 +1379,29 @@ fn percentEncodeAL(list: *std.ArrayList(u8), input: []const u8, comptime set: fn
         }
     }
 }
+fn percentEncodeScalarML(list: *ManyArrayList(15, u8), n: usize, cp: []const u8, comptime set: fn (u8) bool) !void {
+    if (set(cp[0])) {
+        for (cp) |b| {
+            try list.appendSlice(n, &.{'%'});
+            try list.print(n, "{d:0<2}", .{b});
+        }
+    } else {
+        try list.appendSlice(n, &.{cp[0]});
+    }
+}
+fn percentEncodeML(list: *ManyArrayList(15, u8), n: usize, input: []const u8, comptime set: fn (u8) bool) !void {
+    var it = std.unicode.Utf8View.initUnchecked(input).iterator();
+    while (it.nextCodepointSlice()) |sl| {
+        if (set(sl[0])) {
+            for (sl) |b| {
+                try list.appendSlice(n, &.{'%'});
+                try list.print(n, "{d:0<2}", .{b});
+            }
+        } else {
+            try list.appendSlice(n, sl);
+        }
+    }
+}
 
 pub fn ManyArrayList(N: usize, T: type) type {
     return struct {
@@ -1408,6 +1429,24 @@ pub fn ManyArrayList(N: usize, T: type) type {
             const real_n = extras.sum(usize, self.lengths[0..n]);
             const len = self.lengths[n];
             return self.list.items[real_n..][0..len];
+        }
+
+        pub fn clear(self: *@This(), n: usize) void {
+            const real_n = extras.sum(usize, self.lengths[0..n]);
+            self.list.replaceRangeAssumeCapacity(real_n, self.lengths[n], &.{});
+            self.lengths[n] = 0;
+        }
+
+        pub fn print(self: *@This(), n: usize, comptime fmt: []const u8, args: anytype) !void {
+            var buffer: [64]u8 = undefined;
+            const slice = std.fmt.bufPrint(&buffer, fmt, args) catch unreachable;
+            return self.appendSlice(n, slice);
+        }
+
+        pub fn appendSlice(self: *@This(), n: usize, slice: []const T) !void {
+            const real_n = extras.sum(usize, self.lengths[0 .. n + 1]);
+            try self.list.insertSlice(real_n, slice);
+            self.lengths[n] += slice.len;
         }
     };
 }
