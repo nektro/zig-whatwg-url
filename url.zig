@@ -10,6 +10,8 @@ pub const URL = struct {
     protocol: []const u8,
     username: []const u8,
     password: []const u8,
+    hostname: []const u8,
+    hostname_kind: HostKind = .name,
     port: []const u8,
     search: []const u8,
     hash: []const u8,
@@ -83,6 +85,7 @@ pub const URL = struct {
 
         var href = ManyArrayList(8 + 7, u8).init(alloc);
         defer href.deinit();
+        var hostname_kind: HostKind = .name;
         // scheme
         // :
         // //
@@ -90,8 +93,7 @@ pub const URL = struct {
         // :
         // password
         // @
-        var host: Host = .{ .name = "" };
-        defer if (host == .name) alloc.free(host.name);
+        // hostname
         // :
         // port
         // path
@@ -391,9 +393,10 @@ pub const URL = struct {
                         // 3. Let host be the result of host parsing buffer with url is not special.
                         // 4. If host is failure, then return failure.
                         const h = try parseHost(alloc, buffer.items, !isSchemeSpecial(href.items(0)));
+                        defer if (h == .name) alloc.free(h.name);
                         // 5. Set url’s host to host, buffer to the empty string, and state to port state.
-                        // try href.set(7, h);
-                        host = h;
+                        try setHost(&href, h);
+                        hostname_kind = h;
                         buffer.clearRetainingCapacity();
                         state = .port;
                     }
@@ -412,9 +415,10 @@ pub const URL = struct {
                         // 3. Let host be the result of host parsing buffer with url is not special.
                         // 4. If host is failure, then return failure.
                         const h = try parseHost(alloc, buffer.items, !isSchemeSpecial(href.items(0)));
+                        defer if (h == .name) alloc.free(h.name);
                         // 5. Set url’s host to host, buffer to the empty string, and state to path start state.
-                        // try href.set(7, h);
-                        host = h;
+                        try setHost(&href, h);
+                        hostname_kind = h;
                         buffer.clearRetainingCapacity();
                         state = .path_start;
                         // 6. If state override is given, then return.
@@ -573,14 +577,15 @@ pub const URL = struct {
                             // 1. Let host be the result of host parsing buffer with url is not special.
                             // 2. If host is failure, then return failure.
                             var h = try parseHost(alloc, buffer.items, !isSchemeSpecial(href.items(0)));
+                            defer if (h == .name) alloc.free(h.name);
                             // 3. If host is "localhost", then set host to the empty string.
                             if (h == .name and std.mem.eql(u8, h.name, "localhost")) {
                                 alloc.free(h.name);
                                 h = .{ .name = "" };
                             }
                             // 4. Set url’s host to host.
-                            // try href.set(7, h);
-                            host = h;
+                            try setHost(&href, h);
+                            hostname_kind = h;
                             // 5. If state override is given, then return.
                             if (state_override != null) break;
                             // 6. Set buffer to the empty string and state to path start state.
@@ -797,6 +802,8 @@ pub const URL = struct {
             .protocol = _href[0..extras.sum(usize, href.lengths[0..2])],
             .username = _href[extras.sum(usize, href.lengths[0..2])..][0..href.lengths[3]],
             .password = _href[extras.sum(usize, href.lengths[0..4])..][0..href.lengths[5]],
+            .hostname = _href[extras.sum(usize, href.lengths[0..7])..][0..href.lengths[7]],
+            .hostname_kind = hostname_kind,
             .port = _href[extras.sum(usize, href.lengths[0..8])..][0..href.lengths[9]],
             .search = if (href.lengths[12] == 0) "" else _href[extras.sum(usize, href.lengths[0..11])..][0..extras.sum(usize, href.lengths[11..][0..2])],
             .hash = if (href.lengths[14] == 0) "" else _href[extras.sum(usize, href.lengths[0..13])..][0..extras.sum(usize, href.lengths[13..][0..2])],
@@ -1068,7 +1075,7 @@ fn parseHostOpaque(allocator: std.mem.Allocator, input: []const u8) ![]const u8 
     // 3. If input contains a U+0025 (%) and the two code points following it are not ASCII hex digits, invalid-URL-unit validation error.
     {}
     // 4. Return the result of running UTF-8 percent-encode on input using the C0 control percent-encode set.
-    return percentEncode(allocator, input, is_c0control);
+    return percentEncode(allocator, input, is_c0control_percent_char);
 }
 
 /// https://url.spec.whatwg.org/#utf-8-percent-encode
@@ -1190,7 +1197,7 @@ fn parseIPv4(input: []const u8) !u32 {
     numbers_len -= 1;
     // 11. Let counter be 0.
     // 12. For each n of numbers:
-    for (0..numbers_len, 0..) |counter, n| {
+    for (numbers[0..numbers_len], 0..) |n, counter| {
         // 1. Increment ipv4 by n × 256^(3 − counter).
         ipv4 += @as(u32, @intCast(n)) * std.math.pow(u32, 256, 3 - @as(u8, @intCast(counter)));
         // 2. Increment counter by 1.
@@ -1433,6 +1440,55 @@ fn percentEncodeML(list: *ManyArrayList(15, u8), n: usize, input: []const u8, co
         } else {
             try list.appendSlice(n, sl);
         }
+    }
+}
+fn setHost(href: *ManyArrayList(15, u8), h: URL.Host) !void {
+    switch (h) {
+        .name => {
+            try href.set(7, h.name);
+        },
+        .ipv4 => {
+            const bytes: [4]u8 = @bitCast(h.ipv4);
+            try href.print(7, "{d}.{d}.{d}.{d}", .{ bytes[3], bytes[2], bytes[1], bytes[0] });
+        },
+        .ipv6 => {
+            const pieces: [8]u16 = @bitCast(h.ipv6);
+            try href.appendSlice(7, "[");
+            const compress = blk: {
+                var longest: struct { ?usize, u8 } = .{ null, 1 };
+                var found: struct { ?usize, u8 } = .{ null, 0 };
+                for (&pieces, 0..) |piece, pieceIndex| {
+                    if (piece != 0) {
+                        if (found[1] > longest[1]) {
+                            longest[0] = found[0];
+                            longest[1] = found[1];
+                        }
+                        found[0] = null;
+                        found[1] = 0;
+                    } else {
+                        if (found[0] == null) found[0] = pieceIndex;
+                        found[1] += 1;
+                    }
+                }
+                if (found[1] > longest[1]) break :blk found[0];
+                break :blk longest[0];
+            };
+            var ignore0 = false;
+            for (&pieces, 0..) |piece, pieceIndex| {
+                if (ignore0) {
+                    if (piece == 0) continue;
+                    ignore0 = false;
+                }
+                if (compress == pieceIndex) {
+                    try href.appendSlice(7, if (pieceIndex == 0) "::" else ":");
+                    ignore0 = true;
+                    continue;
+                }
+                try href.print(7, "{x}", .{piece});
+                if (pieceIndex != 7) try href.appendSlice(7, ":");
+            }
+            try href.appendSlice(7, "]");
+        },
     }
 }
 

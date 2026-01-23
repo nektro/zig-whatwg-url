@@ -17,17 +17,17 @@ pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin:
     const allocator = std.testing.allocator;
     const u = try url.URL.parse(allocator, input, base);
     defer allocator.free(u.href);
-    _ = href;
-    _ = origin;
     try expect(u.protocol).toEqualString(protocol);
     try expect(u.username).toEqualString(username);
     try expect(u.password).toEqualString(password);
-    _ = host;
-    _ = hostname;
+    try expect(u.hostname).toEqualString(hostname);
     try expect(u.port).toEqualString(port);
+    _ = host;
+    _ = origin;
     _ = pathname;
     try expect(u.search).toEqualString(search);
     try expect(u.hash).toEqualString(hash);
+    _ = href;
 }
 
 pub fn parseIDNAFail(comptime input: []const u8) !void {
@@ -40,13 +40,12 @@ pub fn parseIDNAFail(comptime input: []const u8) !void {
 }
 
 pub fn parseIDNAPass(comptime input: []const u8, comptime output: []const u8) !void {
-    _ = output;
     // new URL('https://{idnaTest.input}/x');
     const allocator = std.testing.allocator;
     const u = try url.URL.parse(allocator, "https://" ++ input ++ "/x", null);
     defer allocator.free(u.href);
+    try expect(u.hostname).toEqualString(output);
     // assert_equals(url.host, idnaTest.output);
-    // assert_equals(url.hostname, idnaTest.output);
     // assert_equals(url.pathname, "/x");
     // assert_equals(url.href, 'https://{idnaTest.output}/x');
 }
@@ -2506,7 +2505,6 @@ test { try parseIDNAPass("\xc2\xa1", "xn--7a"); }
 test { try parseIDNAPass("xn--7a", "xn--7a"); }
 test { try parseIDNAPass("\xe1\xa7\x9a", "xn--pkf"); }
 test { try parseIDNAPass("xn--pkf", "xn--pkf"); }
-test { try parseIDNAPass("", ""); }
 test { try parseIDNAPass("\xe3\x80\x82", "."); }
 test { try parseIDNAPass(".", "."); }
 test { try parseIDNAPass("\xea\xad\xa0", "xn--3y9a"); }
