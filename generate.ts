@@ -54,7 +54,7 @@ pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin:
     try expect(u.password).toEqualString(password);
     _ = host;
     _ = hostname;
-    _ = port;
+    try expect(u.port).toEqualString(port);
     _ = pathname;
     _ = search;
     _ = hash;

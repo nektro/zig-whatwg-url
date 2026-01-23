@@ -10,6 +10,7 @@ pub const URL = struct {
     protocol: []const u8,
     username: []const u8,
     password: []const u8,
+    port: []const u8,
 
     pub const HostKind = enum {
         name,
@@ -783,6 +784,7 @@ pub const URL = struct {
             .protocol = _href[0..extras.sum(usize, href.lengths[0..2])],
             .username = _href[extras.sum(usize, href.lengths[0..2])..][0..href.lengths[3]],
             .password = _href[extras.sum(usize, href.lengths[0..4])..][0..href.lengths[5]],
+            .port = _href[extras.sum(usize, href.lengths[0..8])..][0..href.lengths[9]],
         };
         return url;
     }
