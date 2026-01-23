@@ -12,6 +12,7 @@ pub const URL = struct {
     password: []const u8,
     port: []const u8,
     search: []const u8,
+    hash: []const u8,
 
     pub const HostKind = enum {
         name,
@@ -255,6 +256,7 @@ pub const URL = struct {
                         else if (c == '#') {
                             href.clear(14);
                             state = .fragment;
+                            try href.appendSlice(13, &.{c});
                         }
                         // 4. Otherwise, if c is not the EOF code point:
                         else if (i < length) {
@@ -492,6 +494,7 @@ pub const URL = struct {
                         else if (c == '#') {
                             href.clear(14);
                             state = .fragment;
+                            try href.appendSlice(13, &.{c});
                         }
                         // 4. Otherwise, if c is not the EOF code point:
                         else if (i < length) {
@@ -612,6 +615,7 @@ pub const URL = struct {
                     else if (state_override == null and c == '#') {
                         href.clear(14);
                         state = .fragment;
+                        try href.appendSlice(13, &.{c});
                     }
                     // 4. Otherwise, if c is not the EOF code point:
                     else if (i < length) {
@@ -671,6 +675,7 @@ pub const URL = struct {
                         if (c == '#') {
                             href.clear(14);
                             state = .fragment;
+                            try href.appendSlice(13, &.{c});
                         }
                     }
                     // 2. Otherwise, run these steps:
@@ -700,6 +705,7 @@ pub const URL = struct {
                     else if (c == '#') {
                         href.clear(14);
                         state = .fragment;
+                        try href.appendSlice(13, &.{c});
                     }
                     // 3. Otherwise, if c is U+0020 SPACE:
                     else if (c == ' ') {
@@ -747,6 +753,7 @@ pub const URL = struct {
                         if (c == '#') {
                             href.clear(14);
                             state = .fragment;
+                            try href.appendSlice(13, &.{c});
                         }
                     }
                     // 3. Otherwise, if c is not the EOF code point:
@@ -792,6 +799,7 @@ pub const URL = struct {
             .password = _href[extras.sum(usize, href.lengths[0..4])..][0..href.lengths[5]],
             .port = _href[extras.sum(usize, href.lengths[0..8])..][0..href.lengths[9]],
             .search = if (href.lengths[12] == 0) "" else _href[extras.sum(usize, href.lengths[0..11])..][0..extras.sum(usize, href.lengths[11..][0..2])],
+            .hash = if (href.lengths[14] == 0) "" else _href[extras.sum(usize, href.lengths[0..13])..][0..extras.sum(usize, href.lengths[13..][0..2])],
         };
         return url;
     }
@@ -1385,7 +1393,7 @@ fn percentEncodeScalarAL(list: *std.ArrayList(u8), cp: []const u8, comptime set:
     if (set(cp[0])) {
         for (cp) |b| {
             try list.append('%');
-            try list.writer().print("{X:0<2}", .{b});
+            try list.writer().print("{X:0>2}", .{b});
         }
     } else {
         try list.append(cp[0]);
@@ -1397,7 +1405,7 @@ fn percentEncodeAL(list: *std.ArrayList(u8), input: []const u8, comptime set: fn
         if (set(sl[0])) {
             for (sl) |b| {
                 try list.append('%');
-                try list.writer().print("{X:0<2}", .{b});
+                try list.writer().print("{X:0>2}", .{b});
             }
         } else {
             try list.appendSlice(sl);
@@ -1408,7 +1416,7 @@ fn percentEncodeScalarML(list: *ManyArrayList(15, u8), n: usize, cp: []const u8,
     if (set(cp[0])) {
         for (cp) |b| {
             try list.appendSlice(n, &.{'%'});
-            try list.print(n, "{X:0<2}", .{b});
+            try list.print(n, "{X:0>2}", .{b});
         }
     } else {
         try list.appendSlice(n, &.{cp[0]});
@@ -1420,7 +1428,7 @@ fn percentEncodeML(list: *ManyArrayList(15, u8), n: usize, input: []const u8, co
         if (set(sl[0])) {
             for (sl) |b| {
                 try list.appendSlice(n, &.{'%'});
-                try list.print(n, "{X:0<2}", .{b});
+                try list.print(n, "{X:0>2}", .{b});
             }
         } else {
             try list.appendSlice(n, sl);
