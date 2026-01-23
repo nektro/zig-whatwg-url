@@ -13,6 +13,7 @@ pub const URL = struct {
     hostname: []const u8,
     hostname_kind: HostKind = .name,
     port: []const u8,
+    host: []const u8,
     search: []const u8,
     hash: []const u8,
 
@@ -399,6 +400,7 @@ pub const URL = struct {
                         hostname_kind = h;
                         buffer.clearRetainingCapacity();
                         state = .port;
+                        try href.set(8, ":");
                     }
                     // 3. Otherwise, if one of the following is true:
                     //  - c is the EOF code point, U+002F (/), U+003F (?), or U+0023 (#)
@@ -800,11 +802,12 @@ pub const URL = struct {
         const url: URL = .{
             .href = _href,
             .protocol = _href[0..extras.sum(usize, href.lengths[0..2])],
-            .username = _href[extras.sum(usize, href.lengths[0..2])..][0..href.lengths[3]],
-            .password = _href[extras.sum(usize, href.lengths[0..4])..][0..href.lengths[5]],
+            .username = _href[extras.sum(usize, href.lengths[0..3])..][0..href.lengths[3]],
+            .password = _href[extras.sum(usize, href.lengths[0..5])..][0..href.lengths[5]],
             .hostname = _href[extras.sum(usize, href.lengths[0..7])..][0..href.lengths[7]],
             .hostname_kind = hostname_kind,
-            .port = _href[extras.sum(usize, href.lengths[0..8])..][0..href.lengths[9]],
+            .port = _href[extras.sum(usize, href.lengths[0..9])..][0..href.lengths[9]],
+            .host = _href[extras.sum(usize, href.lengths[0..7])..][0..extras.sum(usize, href.lengths[7..][0..if (href.lengths[9] == 0) 1 else 3])],
             .search = if (href.lengths[12] == 0) "" else _href[extras.sum(usize, href.lengths[0..11])..][0..extras.sum(usize, href.lengths[11..][0..2])],
             .hash = if (href.lengths[14] == 0) "" else _href[extras.sum(usize, href.lengths[0..13])..][0..extras.sum(usize, href.lengths[13..][0..2])],
         };
