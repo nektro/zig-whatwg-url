@@ -21,7 +21,7 @@ pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin:
     _ = origin;
     try expect(u.protocol).toEqualString(protocol);
     try expect(u.username).toEqualString(username);
-    _ = password;
+    try expect(u.password).toEqualString(password);
     _ = host;
     _ = hostname;
     _ = port;
