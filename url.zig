@@ -11,6 +11,7 @@ pub const URL = struct {
     username: []const u8,
     password: []const u8,
     port: []const u8,
+    search: []const u8,
 
     pub const HostKind = enum {
         name,
@@ -248,6 +249,7 @@ pub const URL = struct {
                         if (c == '?') {
                             href.clear(12);
                             state = .query;
+                            try href.appendSlice(11, &.{c});
                         }
                         // 3. Otherwise, if c is U+0023 (#), set url’s fragment to the empty string and state to fragment state.
                         else if (c == '#') {
@@ -484,6 +486,7 @@ pub const URL = struct {
                         if (c == '?') {
                             href.clear(12);
                             state = .query;
+                            try href.appendSlice(11, &.{c});
                         }
                         // 3. Otherwise, if c is U+0023 (#), set url’s fragment to the empty string and state to fragment state.
                         else if (c == '#') {
@@ -603,6 +606,7 @@ pub const URL = struct {
                     else if (state_override == null and c == '?') {
                         href.clear(12);
                         state = .query;
+                        try href.appendSlice(11, &.{c});
                     }
                     // 3. Otherwise, if state override is not given and c is U+0023 (#), set url’s fragment to the empty string and state to fragment state.
                     else if (state_override == null and c == '#') {
@@ -661,6 +665,7 @@ pub const URL = struct {
                         if (c == '?') {
                             href.clear(12);
                             state = .query;
+                            try href.appendSlice(11, &.{c});
                         }
                         // 7. If c is U+0023 (#), then set url’s fragment to the empty string and state to fragment state.
                         if (c == '#') {
@@ -689,6 +694,7 @@ pub const URL = struct {
                     if (c == '?') {
                         href.clear(12);
                         state = .query;
+                        try href.appendSlice(11, &.{c});
                     }
                     // 2. Otherwise, if c is U+0023 (#), then set url’s fragment to the empty string and state to fragment state.
                     else if (c == '#') {
@@ -785,6 +791,7 @@ pub const URL = struct {
             .username = _href[extras.sum(usize, href.lengths[0..2])..][0..href.lengths[3]],
             .password = _href[extras.sum(usize, href.lengths[0..4])..][0..href.lengths[5]],
             .port = _href[extras.sum(usize, href.lengths[0..8])..][0..href.lengths[9]],
+            .search = if (href.lengths[12] == 0) "" else _href[extras.sum(usize, href.lengths[0..11])..][0..extras.sum(usize, href.lengths[11..][0..2])],
         };
         return url;
     }

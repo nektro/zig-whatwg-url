@@ -56,7 +56,7 @@ pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin:
     _ = hostname;
     try expect(u.port).toEqualString(port);
     _ = pathname;
-    _ = search;
+    try expect(u.search).toEqualString(search);
     _ = hash;
 }
 
