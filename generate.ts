@@ -50,7 +50,7 @@ pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin:
     _ = href;
     _ = origin;
     try expect(u.protocol).toEqualString(protocol);
-    _ = username;
+    try expect(u.username).toEqualString(username);
     _ = password;
     _ = host;
     _ = hostname;

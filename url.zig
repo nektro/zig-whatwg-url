@@ -8,6 +8,7 @@ pub const URL = struct {
     href: []const u8,
     scheme: []const u8 = "",
     protocol: []const u8,
+    username: []const u8,
 
     pub const HostKind = enum {
         name,
@@ -327,11 +328,21 @@ pub const URL = struct {
                         // 3. Set atSignSeen to true.
                         atSignSeen = true;
                         // 4. For each codePoint in buffer:
-                        {
+                        var it = std.unicode.Utf8View.initUnchecked(buffer.items).iterator();
+                        while (it.nextCodepointSlice()) |sl| {
                             // 1. If codePoint is U+003A (:) and passwordTokenSeen is false, then set passwordTokenSeen to true and continue.
+                            if (sl[0] == ':' and !passwordTokenSeen) {
+                                passwordTokenSeen = true;
+                                continue;
+                            }
                             // 2. Let encodedCodePoints be the result of running UTF-8 percent-encode codePoint using the userinfo percent-encode set.
                             // 3. If passwordTokenSeen is true, then append encodedCodePoints to url’s password.
                             // 4. Otherwise, append encodedCodePoints to url’s username.
+                            if (passwordTokenSeen) {
+                                try percentEncodeScalarML(&href, 5, sl, is_userinfo_percent_char);
+                            } else {
+                                try percentEncodeScalarML(&href, 3, sl, is_userinfo_percent_char);
+                            }
                         }
                         // 5. Set buffer to the empty string.
                         buffer.clearRetainingCapacity();
@@ -769,6 +780,7 @@ pub const URL = struct {
         const url: URL = .{
             .href = _href,
             .protocol = _href[0..extras.sum(usize, href.lengths[0..2])],
+            .username = _href[extras.sum(usize, href.lengths[0..2])..][0..href.lengths[3]],
         };
         return url;
     }
@@ -1323,23 +1335,25 @@ fn is_fragment_percent_char(c: u8) bool {
     if (c == '`') return true;
     return is_c0control_percent_char(c);
 }
-
-// fn is_userinfo_percent_char(c: u8) bool {
-//     if (c == '/') return true;
-//     if (c == ':') return true;
-//     if (c == ';') return true;
-//     if (c == '=') return true;
-//     if (c == '@') return true;
-//     if (c >= '[' and c <= '^') return true;
-//     if (c == '|') return true;
-//     return is_path_percent_char(c);
-// }
+/// https://url.spec.whatwg.org/#userinfo-percent-encode-set
+fn is_userinfo_percent_char(c: u8) bool {
+    if (c == '/') return true;
+    if (c == ':') return true;
+    if (c == ';') return true;
+    if (c == '=') return true;
+    if (c == '@') return true;
+    if (c >= '[' and c <= '^') return true;
+    if (c == '|') return true;
+    return is_path_percent_char(c);
+}
+// /// https://url.spec.whatwg.org/#component-percent-encode-set
 // fn is_component_percent_char(c: u8) bool {
 //     if (c >= '$' and c <= '&') return true;
 //     if (c == '+') return true;
 //     if (c == ',') return true;
 //     return is_userinfo_percent_char(c);
 // }
+// /// https://url.spec.whatwg.org/#application-x-www-form-urlencoded-percent-encode-set
 // fn is_formurlencoded_percent_char(c: u8) bool {
 //     if (c == '!') return true;
 //     if (c >= '\'' and c <= ')') return true;
@@ -1360,7 +1374,7 @@ fn percentEncodeScalarAL(list: *std.ArrayList(u8), cp: []const u8, comptime set:
     if (set(cp[0])) {
         for (cp) |b| {
             try list.append('%');
-            try list.writer().print("{d:0<2}", .{b});
+            try list.writer().print("{X:0<2}", .{b});
         }
     } else {
         try list.append(cp[0]);
@@ -1372,7 +1386,7 @@ fn percentEncodeAL(list: *std.ArrayList(u8), input: []const u8, comptime set: fn
         if (set(sl[0])) {
             for (sl) |b| {
                 try list.append('%');
-                try list.writer().print("{d:0<2}", .{b});
+                try list.writer().print("{X:0<2}", .{b});
             }
         } else {
             try list.appendSlice(sl);
@@ -1383,7 +1397,7 @@ fn percentEncodeScalarML(list: *ManyArrayList(15, u8), n: usize, cp: []const u8,
     if (set(cp[0])) {
         for (cp) |b| {
             try list.appendSlice(n, &.{'%'});
-            try list.print(n, "{d:0<2}", .{b});
+            try list.print(n, "{X:0<2}", .{b});
         }
     } else {
         try list.appendSlice(n, &.{cp[0]});
@@ -1395,7 +1409,7 @@ fn percentEncodeML(list: *ManyArrayList(15, u8), n: usize, input: []const u8, co
         if (set(sl[0])) {
             for (sl) |b| {
                 try list.appendSlice(n, &.{'%'});
-                try list.print(n, "{d:0<2}", .{b});
+                try list.print(n, "{X:0<2}", .{b});
             }
         } else {
             try list.appendSlice(n, sl);
