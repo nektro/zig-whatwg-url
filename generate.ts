@@ -1,5 +1,30 @@
-const casesraw = await fetch("https://github.com/web-platform-tests/wpt/raw/master/url/resources/urltestdata.json").then((x) => x.json());
-const casesidna = await fetch("https://github.com/web-platform-tests/wpt/raw/master/url/resources/IdnaTestV2.json").then((x) => x.json());
+type Case = {
+  input: string;
+  base: string | null;
+  href: string;
+  origin: string;
+  protocol: string;
+  username: string;
+  password: string;
+  host: string;
+  hostname: string;
+  port: string;
+  pathname: string;
+  search: string;
+  hash: string;
+  failure: undefined;
+};
+type CaseFail = {
+  input: string;
+  base: string | null;
+  failure: true;
+};
+type CaseIDNA = {
+  input: string;
+  output: string | null;
+};
+const casesraw = (await fetch("https://github.com/web-platform-tests/wpt/raw/master/url/resources/urltestdata.json").then((x) => x.json())) as (string | Case | CaseFail)[];
+const casesidna = (await fetch("https://github.com/web-platform-tests/wpt/raw/master/url/resources/IdnaTestV2.json").then((x) => x.json())) as (string | CaseIDNA)[];
 
 const cases = casesraw.filter((v) => typeof v !== "string");
 const f = Bun.file(process.argv[2]!);
@@ -82,39 +107,49 @@ pub fn parseIDNAPass(comptime input: []const u8, comptime output: []const u8) !v
 `);
 
 w.write(`\n`);
-for (const c of cases.filter((v) => v.base == null && !!v.failure)) {
+for (const c of cases) {
+  if (c.base !== null) continue;
+  if (!c.failure) continue;
   w.write(`test { try parseFail("${stringEscape(c.input)}", null); }\n`);
 }
 
 w.write(`\n`);
 // prettier-ignore
 if (false)
-for (const c of cases.filter((v) => v.base != null && !!v.failure)) {
+for (const c of cases) {
+  if (c.base === null) continue;
+  if (!c.failure) continue;
   w.write(`test { try parseFail("${stringEscape(c.input)}", "${stringEscape(c.base!)}"); }\n`);
 }
 
 w.write(`\n`);
-for (const c of cases.filter((v) => v.base == null && !v.failure)) {
+for (const c of cases) {
+  if (c.base !== null) continue;
+  if (c.failure) continue;
   w.write(`test { try parsePass("${E(c.input)}", null, "${E(c.href)}", "${E(c.origin)}", "${E(c.protocol)}", "${E(c.username)}", "${E(c.password)}", "${E(c.host)}", "${E(c.hostname)}", "${E(c.port)}", "${E(c.pathname)}", "${E(c.search)}", "${E(c.hash)}"); }\n`);
 }
 
 w.write(`\n`);
 // prettier-ignore
 if (false)
-for (const c of cases.filter((v) => v.base != null && !v.failure)) {
+for (const c of cases) {
+  if (c.base === null) continue;
+  if (c.failure) continue;
   w.write(`test { try parsePass("${E(c.input)}", "${E(c.base!)}", "${E(c.href)}", "${E(c.origin)}", "${E(c.protocol)}", "${E(c.username)}", "${E(c.password)}", "${E(c.host)}", "${E(c.hostname)}", "${E(c.port)}", "${E(c.pathname)}", "${E(c.search)}", "${E(c.hash)}"); }\n`);
 }
 
 w.write(`\n`);
-for (const c of casesidna.filter((v) => typeof v !== "string").filter((v) => v.output === null)) {
+for (const c of casesidna.filter((v) => typeof v !== "string")) {
   if (c.input.length === 0) continue;
+  if (c.output !== null) continue;
   w.write(`test { try parseIDNAFail("${stringEscape(c.input)}"); }\n`);
 }
 
 w.write(`\n`);
-for (const c of casesidna.filter((v) => typeof v !== "string").filter((v) => v.output !== null)) {
+for (const c of casesidna.filter((v) => typeof v !== "string")) {
   if (c.input.length === 0) continue;
-  w.write(`test { try parseIDNAPass("${stringEscape(c.input)}", "${stringEscape(c.output!)}"); }\n`);
+  if (c.output === null) continue;
+  w.write(`test { try parseIDNAPass("${stringEscape(c.input)}", "${stringEscape(c.output)}"); }\n`);
 }
 
 w.flush();
