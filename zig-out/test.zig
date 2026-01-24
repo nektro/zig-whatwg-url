@@ -427,6 +427,8 @@ test { try parsePass("http://foo.bar/baz?qux#foo<bar", null, "http://foo.bar/baz
 test { try parsePass("http://foo.bar/baz?qux#foo>bar", null, "http://foo.bar/baz?qux#foo%3Ebar", "http://foo.bar", "http:", "", "", "foo.bar", "foo.bar", "", "/baz", "?qux", "#foo%3Ebar"); }
 test { try parsePass("http://foo.bar/baz?qux#foo`bar", null, "http://foo.bar/baz?qux#foo%60bar", "http://foo.bar", "http:", "", "", "foo.bar", "foo.bar", "", "/baz", "?qux", "#foo%60bar"); }
 test { try parsePass("https://0x.0x.0", null, "https://0.0.0.0/", "https://0.0.0.0", "https:", "", "", "0.0.0.0", "0.0.0.0", "", "/", "", ""); }
+test { try parsePass("https://0x.0x.0x.0x", null, "https://0.0.0.0/", "https://0.0.0.0", "https:", "", "", "0.0.0.0", "0.0.0.0", "", "/", "", ""); }
+test { try parsePass("https://00.00.00.00", null, "https://0.0.0.0/", "https://0.0.0.0", "https:", "", "", "0.0.0.0", "0.0.0.0", "", "/", "", ""); }
 test { try parsePass("file:///C%3A/", null, "file:///C%3A/", "", "file:", "", "", "", "", "", "/C%3A/", "", ""); }
 test { try parsePass("file:///C%7C/", null, "file:///C%7C/", "", "file:", "", "", "", "", "", "/C%7C/", "", ""); }
 test { try parsePass("asdf://%43%7C/", null, "asdf://%43%7C/", "null", "asdf:", "", "", "%43%7C", "%43%7C", "", "/", "", ""); }

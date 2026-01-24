@@ -9,6 +9,3 @@
 A WHATWG URL-compatible parser for Zig.
 
 https://url.spec.whatwg.org/
-
-`urltestdata.json` is from https://github.com/web-platform-tests/wpt/blob/master/url/resources/urltestdata.json.
-Last fetched at `048018b5af85f8d47b8a704b48cf6f9c0a461876`.

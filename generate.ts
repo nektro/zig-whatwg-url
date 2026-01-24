@@ -1,4 +1,4 @@
-import casesraw from "./urltestdata.json";
+const casesraw = await fetch("https://github.com/web-platform-tests/wpt/raw/master/url/resources/urltestdata.json").then((x) => x.json());
 const casesidna = await fetch("https://github.com/web-platform-tests/wpt/raw/master/url/resources/IdnaTestV2.json").then((x) => x.json());
 
 const cases = casesraw.filter((v) => typeof v !== "string");
