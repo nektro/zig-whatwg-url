@@ -11,7 +11,7 @@ pub const URL = struct {
     username: []const u8,
     password: []const u8,
     hostname: []const u8,
-    hostname_kind: HostKind = .name,
+    hostname_kind: HostKind,
     port: []const u8,
     host: []const u8,
     pathname: []const u8,
@@ -19,12 +19,14 @@ pub const URL = struct {
     hash: []const u8,
 
     pub const HostKind = enum {
+        unset,
         name,
         ipv4,
         ipv6,
     };
 
     const Host = union(HostKind) {
+        unset: void,
         name: []const u8,
         ipv4: u32,
         ipv6: u128,
@@ -87,7 +89,8 @@ pub const URL = struct {
 
         var href = ManyArrayList(8 + 7, u8).init(alloc);
         defer href.deinit();
-        var hostname_kind: HostKind = .name;
+        var hostname_kind: HostKind = .unset;
+        var has_opaque_path = false;
         // scheme
         // :
         // //
@@ -178,6 +181,7 @@ pub const URL = struct {
                         else {
                             href.clear(10);
                             state = .opaque_path;
+                            has_opaque_path = true;
                         }
                     }
                     // 3. Otherwise, if state override is not given, set buffer to the empty string, state to no scheme state, and start over (from the first code point in input).
@@ -402,7 +406,6 @@ pub const URL = struct {
                         hostname_kind = h;
                         buffer.clearRetainingCapacity();
                         state = .port;
-                        try href.set(8, ":");
                     }
                     // 3. Otherwise, if one of the following is true:
                     //  - c is the EOF code point, U+002F (/), U+003F (?), or U+0023 (#)
@@ -479,6 +482,7 @@ pub const URL = struct {
                     try href.set(0, "file");
                     // 2. Set url’s host to the empty string.
                     href.clear(7);
+                    hostname_kind = .name;
                     // 3. If c is U+002F (/) or U+005C (\), then:
                     if (c == '/' or c == '\\') {
                         // 1. If c is U+005C (\), invalid-reverse-solidus validation error.
@@ -574,6 +578,7 @@ pub const URL = struct {
                         else if (buffer.items.len == 0) {
                             // 1. Set url’s host to the empty string.
                             href.clear(7);
+                            hostname_kind = .name;
                             // 2. If state override is given, then return.
                             if (state_override != null) break;
                             // 3. Set state to path start state.
@@ -814,6 +819,25 @@ pub const URL = struct {
             }
         }
 
+        if (hostname_kind != .unset) {
+            try href.appendSlice(2, "//");
+        }
+        if (href.lengths[5] > 0) {
+            try href.set(4, ":");
+        }
+        if (href.lengths[3] > 0 or href.lengths[5] > 0) {
+            try href.set(6, "@");
+        }
+        if (href.lengths[9] > 0) {
+            try href.set(8, ":");
+        }
+
+        var path_offset: usize = 0;
+        if (hostname_kind == .unset and !has_opaque_path and std.mem.startsWith(u8, href.items(10), "//")) {
+            try href.replace(10, 0, 0, "/.");
+            path_offset += 2;
+        }
+
         const _href = try href.list.toOwnedSlice();
 
         const url: URL = .{
@@ -825,7 +849,7 @@ pub const URL = struct {
             .hostname_kind = hostname_kind,
             .port = _href[extras.sum(usize, href.lengths[0..9])..][0..href.lengths[9]],
             .host = _href[extras.sum(usize, href.lengths[0..7])..][0..extras.sum(usize, href.lengths[7..][0..if (href.lengths[9] == 0) 1 else 3])],
-            .pathname = _href[extras.sum(usize, href.lengths[0..10])..][0..href.lengths[10]],
+            .pathname = _href[extras.sum(usize, href.lengths[0..10])..][0..href.lengths[10]][path_offset..],
             .search = if (href.lengths[12] == 0) "" else _href[extras.sum(usize, href.lengths[0..11])..][0..extras.sum(usize, href.lengths[11..][0..2])],
             .hash = if (href.lengths[14] == 0) "" else _href[extras.sum(usize, href.lengths[0..13])..][0..extras.sum(usize, href.lengths[13..][0..2])],
         };
@@ -1466,6 +1490,7 @@ fn percentEncodeML(list: *ManyArrayList(15, u8), n: usize, input: []const u8, co
 }
 fn setHost(href: *ManyArrayList(15, u8), h: URL.Host) !void {
     switch (h) {
+        .unset => unreachable,
         .name => {
             try href.set(7, h.name);
         },

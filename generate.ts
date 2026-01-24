@@ -57,7 +57,7 @@ pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin:
     try expect(u.pathname).toEqualString(pathname);
     try expect(u.search).toEqualString(search);
     try expect(u.hash).toEqualString(hash);
-    _ = href;
+    try expect(u.href).toEqualString(href);
 }
 
 pub fn parseIDNAFail(comptime input: []const u8) !void {
