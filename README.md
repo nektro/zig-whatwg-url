@@ -12,6 +12,3 @@ https://url.spec.whatwg.org/
 
 `urltestdata.json` is from https://github.com/web-platform-tests/wpt/blob/master/url/resources/urltestdata.json.
 Last fetched at `048018b5af85f8d47b8a704b48cf6f9c0a461876`.
-
-`IdnaTestV2.json` is from https://github.com/web-platform-tests/wpt/blob/master/url/resources/IdnaTestV2.json.
-Last fetched at `40fc257a28faf7c378f59185235685ea8684e8f4`.

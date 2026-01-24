@@ -1,5 +1,5 @@
 import casesraw from "./urltestdata.json";
-import casesidna from "./IdnaTestV2.json";
+const casesidna = await fetch("https://github.com/web-platform-tests/wpt/raw/master/url/resources/IdnaTestV2.json").then((x) => x.json());
 
 const cases = casesraw.filter((v) => typeof v !== "string");
 const f = Bun.file(process.argv[2]!);
