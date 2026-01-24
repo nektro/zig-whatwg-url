@@ -47,14 +47,14 @@ pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin:
     const allocator = std.testing.allocator;
     const u = try url.URL.parse(allocator, input, base);
     defer allocator.free(u.href);
+    _ = origin;
     try expect(u.protocol).toEqualString(protocol);
     try expect(u.username).toEqualString(username);
     try expect(u.password).toEqualString(password);
     try expect(u.hostname).toEqualString(hostname);
     try expect(u.port).toEqualString(port);
     try expect(u.host).toEqualString(host);
-    _ = origin;
-    _ = pathname;
+    try expect(u.pathname).toEqualString(pathname);
     try expect(u.search).toEqualString(search);
     try expect(u.hash).toEqualString(hash);
     _ = href;
@@ -76,7 +76,7 @@ pub fn parseIDNAPass(comptime input: []const u8, comptime output: []const u8) !v
     defer allocator.free(u.href);
     try expect(u.hostname).toEqualString(output);
     try expect(u.host).toEqualString(output);
-    // assert_equals(url.pathname, "/x");
+    try expect(u.pathname).toEqualString("/x");
     // assert_equals(url.href, 'https://{idnaTest.output}/x');
 }
 `);

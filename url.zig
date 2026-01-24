@@ -14,6 +14,7 @@ pub const URL = struct {
     hostname_kind: HostKind = .name,
     port: []const u8,
     host: []const u8,
+    pathname: []const u8,
     search: []const u8,
     hash: []const u8,
 
@@ -225,6 +226,7 @@ pub const URL = struct {
                         pointer -= 1;
                         i = lastcpi(inputl.items[0..i]);
                         c = inputl.items[i];
+                        try href.appendSlice(10, "/");
                     }
                 },
                 .relative => {
@@ -413,7 +415,7 @@ pub const URL = struct {
                         // 1. If url is special and buffer is the empty string, host-missing validation error, return failure.
                         if (isSchemeSpecial(href.items(0)) and buffer.items.len == 0) return error.InvalidURL
                         // 2. Otherwise, if state override is given, buffer is the empty string, and either url includes credentials or url’s port is non-null, then return failure.
-                        else if (state_override != null and buffer.items.len == 0 and (href.items(3).len > 0 or href.items(5).len > 0)) return error.InvalidURL;
+                        else if (state_override != null and buffer.items.len == 0 and (href.lengths[3] > 0 or href.lengths[5] > 0)) return error.InvalidURL;
                         // 3. Let host be the result of host parsing buffer with url is not special.
                         // 4. If host is failure, then return failure.
                         const h = try parseHost(alloc, buffer.items, !isSchemeSpecial(href.items(0)));
@@ -527,6 +529,7 @@ pub const URL = struct {
                         pointer -= 1;
                         i = lastcpi(inputl.items[0..i]);
                         c = inputl.items[i];
+                        try href.appendSlice(10, "/");
                     }
                 },
                 .file_slash => {
@@ -552,6 +555,7 @@ pub const URL = struct {
                         pointer -= 1;
                         i = lastcpi(inputl.items[0..i]);
                         c = inputl.items[i];
+                        try href.appendSlice(10, "/");
                     }
                 },
                 .file_host => {
@@ -564,6 +568,7 @@ pub const URL = struct {
                         // > This is a (platform-independent) Windows drive letter quirk. buffer is not reset here and instead used in the path state.
                         if (state_override == null and isWindowsDriveLetter(buffer.items)) {
                             state = .path;
+                            try href.appendSlice(10, "/");
                         }
                         // 2. Otherwise, if buffer is the empty string, then:
                         else if (buffer.items.len == 0) {
@@ -596,7 +601,9 @@ pub const URL = struct {
                         }
                     }
                     // 2. Otherwise, append c to buffer.
-                    try buffer.appendSlice(inputl.items[i..][0..l(c)]);
+                    else {
+                        try buffer.appendSlice(inputl.items[i..][0..l(c)]);
+                    }
                 },
                 .path_start => {
                     // 1. If url is special, then:
@@ -611,6 +618,7 @@ pub const URL = struct {
                             i = lastcpi(inputl.items[0..i]);
                             c = inputl.items[i];
                         }
+                        try href.appendSlice(10, "/");
                     }
                     // 2. Otherwise, if state override is not given and c is U+003F (?), set url’s query to the empty string and state to query state.
                     else if (state_override == null and c == '?') {
@@ -633,6 +641,8 @@ pub const URL = struct {
                             pointer -= 1;
                             i = lastcpi(inputl.items[0..i]);
                             c = inputl.items[i];
+                        } else {
+                            try href.appendSlice(10, &.{c});
                         }
                     }
                     // 5. Otherwise, if state override is given and url’s host is null, append the empty string to url’s path.
@@ -641,34 +651,41 @@ pub const URL = struct {
                     }
                 },
                 .path => {
+                    const is_lsep = c == '/';
+                    const is_rsep = isSchemeSpecial(href.items(0)) and c == '\\';
                     // 1. If one of the following is true:
                     //  - c is the EOF code point or U+002F (/)
                     //  - url is special and c is U+005C (\)
                     //  - state override is not given and c is U+003F (?) or U+0023 (#)
                     // then:
-                    if ((i == length or c == '/') or (isSchemeSpecial(href.items(0)) and c == '\\') or (state_override == null and (c == '?' or c == '#'))) {
+                    if ((i == length or is_lsep) or (is_rsep) or (state_override == null and (c == '?' or c == '#'))) {
                         // 1. If url is special and c is U+005C (\), invalid-reverse-solidus validation error.
                         {}
                         // 2. If buffer is a double-dot URL path segment, then:
                         if (isDoubleDotPathSeg(buffer.items)) {
-                            // @panic("TODO");
+                            const olen = href.lengths[10];
+                            const idx = std.mem.lastIndexOfScalar(u8, href.items(10)[0 .. olen - 1], '/') orelse 0;
+                            try href.replace(10, idx + 1, olen - idx - 1, "");
                             // 1. Shorten url’s path.
                             // 2. If neither c is U+002F (/), nor url is special and c is U+005C (\), append the empty string to url’s path.
                             // > This means that for input /usr/.. the result is / and not a lack of a path.
                         }
                         // 3. Otherwise, if buffer is a single-dot URL path segment and if neither c is U+002F (/), nor url is special and c is U+005C (\), append the empty string to url’s path.
-                        else if (isSingleDotPathSeg(buffer.items) and (c != '/' or !(isSchemeSpecial(href.items(0)) and c == '\\'))) {
-                            // @panic("TODO");
+                        else if (isSingleDotPathSeg(buffer.items) and (c != '/' or !(is_rsep))) {
+                            // =no action needed
                         }
                         // 4. Otherwise, if buffer is not a single-dot URL path segment, then:
                         else if (!isSingleDotPathSeg(buffer.items)) {
                             // 1. If url’s scheme is "file", url’s path is empty, and buffer is a Windows drive letter, then replace the second code point in buffer with U+003A (:).
                             // > This is a (platform-independent) Windows drive letter quirk.
-                            if (std.mem.eql(u8, href.items(0), "file") and href.items(10).len == 0 and isWindowsDriveLetter(buffer.items)) {
+                            if (std.mem.eql(u8, href.items(0), "file") and href.lengths[10] <= 1 and isWindowsDriveLetter(buffer.items)) {
                                 buffer.items[1] = ':';
                             }
                             // 2. Append buffer to url’s path.
+                            // if (!std.mem.endsWith(u8, href.items(10), "/")) try href.appendSlice(10, "/");
                             try href.appendSlice(10, buffer.items);
+                            if (is_lsep) try href.appendSlice(10, "/");
+                            if (is_rsep) try href.appendSlice(10, "/");
                         }
                         // 5. Set buffer to the empty string.
                         buffer.clearRetainingCapacity();
@@ -808,6 +825,7 @@ pub const URL = struct {
             .hostname_kind = hostname_kind,
             .port = _href[extras.sum(usize, href.lengths[0..9])..][0..href.lengths[9]],
             .host = _href[extras.sum(usize, href.lengths[0..7])..][0..extras.sum(usize, href.lengths[7..][0..if (href.lengths[9] == 0) 1 else 3])],
+            .pathname = _href[extras.sum(usize, href.lengths[0..10])..][0..href.lengths[10]],
             .search = if (href.lengths[12] == 0) "" else _href[extras.sum(usize, href.lengths[0..11])..][0..extras.sum(usize, href.lengths[11..][0..2])],
             .hash = if (href.lengths[14] == 0) "" else _href[extras.sum(usize, href.lengths[0..13])..][0..extras.sum(usize, href.lengths[13..][0..2])],
         };
@@ -1345,6 +1363,7 @@ fn is_query_percent_char(c: u8) bool {
 /// https://url.spec.whatwg.org/#path-percent-encode-set
 fn is_path_percent_char(c: u8) bool {
     if (c == '?') return true;
+    if (c == '^') return true;
     if (c == '`') return true;
     if (c == '{') return true;
     if (c == '}') return true;
@@ -1371,7 +1390,7 @@ fn is_userinfo_percent_char(c: u8) bool {
     if (c == ';') return true;
     if (c == '=') return true;
     if (c == '@') return true;
-    if (c >= '[' and c <= '^') return true;
+    if (c >= '[' and c <= ']') return true;
     if (c == '|') return true;
     return is_path_percent_char(c);
 }
@@ -1494,6 +1513,23 @@ fn setHost(href: *ManyArrayList(15, u8), h: URL.Host) !void {
         },
     }
 }
+pub fn replaceInPlace(comptime T: type, input: []T, needle: []const T, replacement: []const T) usize {
+    // Empty needle will loop until output buffer overflows.
+    std.debug.assert(needle.len > 0);
+    std.debug.assert(needle.len >= replacement.len);
+
+    var slide: usize = 0;
+    var replacements: usize = 0;
+    while (std.mem.indexOf(u8, input[slide..], needle)) |idx| {
+        slide += idx;
+        std.mem.copyForwards(u8, input[slide..], replacement);
+        slide += replacement.len;
+        std.mem.copyForwards(u8, input[slide..], input[slide..][needle.len - replacement.len ..]);
+        slide += needle.len - replacement.len;
+        replacements += 1;
+    }
+    return replacements;
+}
 
 pub fn ManyArrayList(N: usize, T: type) type {
     return struct {
@@ -1538,6 +1574,14 @@ pub fn ManyArrayList(N: usize, T: type) type {
         pub fn appendSlice(self: *@This(), n: usize, slice: []const T) !void {
             const real_n = extras.sum(usize, self.lengths[0 .. n + 1]);
             try self.list.insertSlice(real_n, slice);
+            self.lengths[n] += slice.len;
+        }
+
+        pub fn replace(self: *@This(), n: usize, o: usize, c: usize, slice: []const T) !void {
+            std.debug.assert(o + c <= self.lengths[n]);
+            const real_n = extras.sum(usize, self.lengths[0..n]);
+            try self.list.replaceRange(real_n + o, c, slice);
+            self.lengths[n] -= c;
             self.lengths[n] += slice.len;
         }
     };
