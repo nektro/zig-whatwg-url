@@ -90,7 +90,6 @@ pub const URL = struct {
         var href = ManyArrayList(8 + 7, u8).init(alloc);
         defer href.deinit();
         var hostname_kind: HostKind = .unset;
-        var has_opaque_path = false;
         // scheme
         // :
         // //
@@ -181,7 +180,6 @@ pub const URL = struct {
                         else {
                             href.clear(10);
                             state = .opaque_path;
-                            has_opaque_path = true;
                         }
                     }
                     // 3. Otherwise, if state override is not given, set buffer to the empty string, state to no scheme state, and start over (from the first code point in input).
@@ -833,7 +831,7 @@ pub const URL = struct {
         }
 
         var path_offset: usize = 0;
-        if (hostname_kind == .unset and !has_opaque_path and std.mem.startsWith(u8, href.items(10), "//")) {
+        if (hostname_kind == .unset and std.mem.startsWith(u8, href.items(10), "//")) {
             try href.replace(10, 0, 0, "/.");
             path_offset += 2;
         }
