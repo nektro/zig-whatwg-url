@@ -264,6 +264,66 @@ test { try parseFail("stun://test:test", null); }
 test { try parseFail("stun://[:1]", null); }
 test { try parseFail("non-special://host\\a", null); }
 
+test { try parseFail("http://f:b/c", "http://example.org/foo/bar"); }
+test { try parseFail("http://f: /c", "http://example.org/foo/bar"); }
+test { try parseFail("http://f:fifty-two/c", "http://example.org/foo/bar"); }
+test { try parseFail("http://f:999999/c", "http://example.org/foo/bar"); }
+test { try parseFail("non-special://f:999999/c", "http://example.org/foo/bar"); }
+test { try parseFail("http://f: 21 / b ? d # e ", "http://example.org/foo/bar"); }
+test { try parseFail("http://[1::2]:3:4", "http://example.org/foo/bar"); }
+test { try parseFail("http://2001::1", "http://example.org/foo/bar"); }
+test { try parseFail("http://2001::1]", "http://example.org/foo/bar"); }
+test { try parseFail("http://2001::1]:80", "http://example.org/foo/bar"); }
+test { try parseFail("http://[::127.0.0.1.]", "http://example.org/foo/bar"); }
+test { try parseFail("http://example example.com", "http://other.com/"); }
+test { try parseFail("http://Goo%20 goo%7C|.com", "http://other.com/"); }
+test { try parseFail("http://[]", "http://other.com/"); }
+test { try parseFail("http://[:]", "http://other.com/"); }
+test { try parseFail("http://GOO\xc2\xa0\xe3\x80\x80goo.com", "http://other.com/"); }
+test { try parseFail("http://\xef\xb7\x90zyx.com", "http://other.com/"); }
+test { try parseFail("http://%ef%b7%90zyx.com", "http://other.com/"); }
+test { try parseFail("http://\xef\xbc\x85\xef\xbc\x94\xef\xbc\x91.com", "http://other.com/"); }
+test { try parseFail("http://%ef%bc%85%ef%bc%94%ef%bc%91.com", "http://other.com/"); }
+test { try parseFail("http://\xef\xbc\x85\xef\xbc\x90\xef\xbc\x90.com", "http://other.com/"); }
+test { try parseFail("http://%ef%bc%85%ef%bc%90%ef%bc%90.com", "http://other.com/"); }
+test { try parseFail("http://%zz%66%a.com", "http://other.com/"); }
+test { try parseFail("http://%25", "http://other.com/"); }
+test { try parseFail("http://hello%00", "http://other.com/"); }
+test { try parseFail("http://192.168.0.257", "http://other.com/"); }
+test { try parseFail("http://%3g%78%63%30%2e%30%32%35%30%2E.01", "http://other.com/"); }
+test { try parseFail("http://192.168.0.1 hello", "http://other.com/"); }
+test { try parseFail("http://[google.com]", "http://other.com/"); }
+test { try parseFail("http://[::1.2.3.4x]", "http://other.com/"); }
+test { try parseFail("http://[::1.2.3.]", "http://other.com/"); }
+test { try parseFail("http://[::1.2.]", "http://other.com/"); }
+test { try parseFail("http://[::.1.2]", "http://other.com/"); }
+test { try parseFail("http://[::1.]", "http://other.com/"); }
+test { try parseFail("http://[::.1]", "http://other.com/"); }
+test { try parseFail("http://[::%31]", "http://other.com/"); }
+test { try parseFail("http://%5B::1]", "http://other.com/"); }
+test { try parseFail("i", "sc:sd"); }
+test { try parseFail("i", "sc:sd/sd"); }
+test { try parseFail("../i", "sc:sd"); }
+test { try parseFail("../i", "sc:sd/sd"); }
+test { try parseFail("/i", "sc:sd"); }
+test { try parseFail("/i", "sc:sd/sd"); }
+test { try parseFail("?i", "sc:sd"); }
+test { try parseFail("?i", "sc:sd/sd"); }
+test { try parseFail("http:", "https://example.org/foo/bar"); }
+test { try parseFail("http://10000000000", "http://other.com/"); }
+test { try parseFail("http://4294967296", "http://other.com/"); }
+test { try parseFail("http://0xffffffff1", "http://other.com/"); }
+test { try parseFail("http://256.256.256.256", "http://other.com/"); }
+test { try parseFail("http://[0:1:2:3:4:5:6:7:8]", "http://example.net/"); }
+test { try parseFail("http://f:4294967377/c", "http://example.org/"); }
+test { try parseFail("http://f:18446744073709551697/c", "http://example.org/"); }
+test { try parseFail("http://f:340282366920938463463374607431768211537/c", "http://example.org/"); }
+test { try parseFail("test-a-colon.html", "a:"); }
+test { try parseFail("test-a-colon-b.html", "a:b"); }
+test { try parseFail("http://1.2.3.4.5", "http://other.com/"); }
+test { try parseFail("http://1.2.3.4.5.", "http://other.com/"); }
+test { try parseFail("http://256.256.256.256.256", "http://other.com/"); }
+test { try parseFail("http://256.256.256.256.256.", "http://other.com/"); }
 
 test { try parsePass("https://test:@test", null, "https://test@test/", "https://test", "https:", "test", "", "test", "test", "", "/", "", ""); }
 test { try parsePass("https://:@test", null, "https://test/", "https://test", "https:", "", "", "test", "test", "", "/", "", ""); }

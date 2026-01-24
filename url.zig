@@ -34,8 +34,12 @@ pub const URL = struct {
 
     /// Caller owns memory and is responsible for freeing `url.href`.
     pub fn parse(alloc: std.mem.Allocator, input: []const u8, base: ?[]const u8) !URL {
-        const u = try parseBasic(alloc, input, if (base) |b| try parseBasic(alloc, b, null, null) else null, null);
-        return u;
+        if (base) |b| {
+            const b_url = try parseBasic(alloc, b, null, null);
+            defer alloc.free(b_url.href);
+            return parseBasic(alloc, input, b_url, null);
+        }
+        return parseBasic(alloc, input, if (base) |b| try parseBasic(alloc, b, null, null) else null, null);
     }
 
     /// https://url.spec.whatwg.org/#concept-basic-url-parser
@@ -976,7 +980,7 @@ fn parseIPv6(input: []const u8) !u128 {
     std.debug.assert(extras.matchesAll(u8, input, std.ascii.isAscii));
     var pointer: usize = 0;
     // 5. If c is U+003A (:), then:
-    if (input[pointer] == ':') {
+    if (input.len > 0 and input[pointer] == ':') {
         // 1. If remaining does not start with U+003A (:), IPv6-invalid-compression validation error, return failure.
         if (!std.mem.startsWith(u8, input[pointer + 1 ..], ":")) return error.InvalidURL;
         // 2. Increase pointer by 2.
@@ -1233,7 +1237,7 @@ fn parseIPv4(input: []const u8) !u32 {
     // 7. If any but the last item in numbers is greater than 255, then return failure.
     for (0..numbers_len - 1) |i| if (numbers[i] > 255) return error.InvalidURL;
     // 8. If the last item in numbers is greater than or equal to 256^(5 − numbers’s size), then return failure.
-    if (numbers[numbers_len - 1] >= std.math.pow(u32, 256, 5 - numbers_len)) return error.InvalidURL;
+    if (numbers[numbers_len - 1] >= std.math.pow(u64, 256, 5 - numbers_len)) return error.InvalidURL;
     // 9. Let ipv4 be the last item in numbers.
     var ipv4 = numbers[numbers_len - 1];
     // 10. Remove the last item from numbers.
