@@ -6,10 +6,11 @@ const expect = @import("expect").expect;
 
 pub fn parseFail(input: []const u8, base: ?[]const u8) !void {
     const allocator = std.testing.allocator;
-    _ = url.URL.parse(allocator, input, base) catch |err| switch (err) {
+    const u = url.URL.parse(allocator, input, base) catch |err| switch (err) {
         error.InvalidURL => return,
         error.OutOfMemory => return error.OutOfMemory,
     };
+    defer allocator.free(u.href);
     return error.FailZigTest;
 }
 
@@ -32,10 +33,11 @@ pub fn parsePass(input: []const u8, base: ?[]const u8, href: []const u8, origin:
 
 pub fn parseIDNAFail(comptime input: []const u8) !void {
     const allocator = std.testing.allocator;
-    _ = url.URL.parse(allocator, "https://" ++ input ++ "/x", null) catch |err| switch (err) {
+    const u = url.URL.parse(allocator, "https://" ++ input ++ "/x", null) catch |err| switch (err) {
         error.InvalidURL => return,
         error.OutOfMemory => return error.OutOfMemory,
     };
+    defer allocator.free(u.href);
     return error.FailZigTest;
 }
 
