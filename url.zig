@@ -6,7 +6,6 @@ const unicode_idna = @import("unicode-idna");
 
 pub const URL = struct {
     href: []const u8,
-    scheme: []const u8 = "",
     protocol: []const u8,
     username: []const u8,
     password: []const u8,
@@ -164,7 +163,7 @@ pub const URL = struct {
                             state = .file;
                         }
                         // 6. Otherwise, if url is special, base is non-null, and base’s scheme is url’s scheme:
-                        else if (isSchemeSpecial(href.items(0)) and base != null and std.mem.eql(u8, base.?.scheme, href.items(0))) {
+                        else if (isSchemeSpecial(href.items(0)) and base != null and std.mem.eql(u8, base.?.scheme(), href.items(0))) {
                             @panic("TODO");
                             // 1. Assert: base is special (and therefore does not have an opaque path).
                             // 2. Set state to special relative or authority state.
@@ -237,9 +236,10 @@ pub const URL = struct {
                 },
                 .relative => {
                     // 1. Assert: base’s scheme is not "file".
-                    std.debug.assert(!std.mem.eql(u8, base.?.scheme, "file"));
+                    std.debug.assert(!std.mem.eql(u8, base.?.scheme(), "file"));
                     // 2. Set url’s scheme to base’s scheme.
-                    try href.set(0, base.?.scheme);
+                    try href.set(0, base.?.scheme());
+                    try href.set(1, ":");
                     // 3. If c is U+002F (/), then set state to relative slash state.
                     if (c == '/') {
                         state = .relative_slash;
@@ -482,6 +482,7 @@ pub const URL = struct {
                 .file => {
                     // 1. Set url’s scheme to "file".
                     try href.set(0, "file");
+                    try href.set(1, ":");
                     // 2. Set url’s host to the empty string.
                     href.clear(7);
                     hostname_kind = .name;
@@ -493,7 +494,7 @@ pub const URL = struct {
                         state = .file_slash;
                     }
                     // 4. Otherwise, if base is non-null and base’s scheme is "file":
-                    else if (base != null and std.mem.eql(u8, base.?.scheme, "file")) {
+                    else if (base != null and std.mem.eql(u8, base.?.scheme(), "file")) {
                         // 1. Set url’s host to base’s host, url’s path to a clone of base’s path, and url’s query to base’s query.
                         // host = base.?.host;
                         // try path.appendSlice(base.?.path.?);
@@ -549,7 +550,7 @@ pub const URL = struct {
                     // 2. Otherwise:
                     else {
                         // 1. If base is non-null and base’s scheme is "file", then:
-                        if (base != null and std.mem.eql(u8, base.?.scheme, "file")) {
+                        if (base != null and std.mem.eql(u8, base.?.scheme(), "file")) {
                             // 1. Set url’s host to base’s host.
                             // host = base.?.host;
                             // 2. If the code point substring from pointer to the end of input does not start with a Windows drive letter and base’s path[0] is a normalized Windows drive letter, then append base’s path[0] to url’s path.
@@ -883,7 +884,11 @@ pub const URL = struct {
     };
 
     pub fn isSpecial(u: *const URL) bool {
-        return isSchemeSpecial(u.scheme);
+        return isSchemeSpecial(u.scheme());
+    }
+
+    pub fn scheme(u: *const URL) []const u8 {
+        return u.protocol[0 .. u.protocol.len - 1];
     }
 };
 
