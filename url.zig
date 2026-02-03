@@ -882,7 +882,7 @@ pub const URL = struct {
         fragment,
     };
 
-    pub fn isSpecial(u: URL) bool {
+    pub fn isSpecial(u: *const URL) bool {
         return isSchemeSpecial(u.scheme);
     }
 };
