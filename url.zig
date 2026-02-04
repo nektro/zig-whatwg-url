@@ -1257,7 +1257,7 @@ fn domainToAscii(allocator: std.mem.Allocator, domain: []const u8, beStrict: boo
     return result;
 }
 
-// https://url.spec.whatwg.org/#ends-in-a-number-checker
+/// https://url.spec.whatwg.org/#ends-in-a-number-checker
 fn endsInANumber(input: []const u8) bool {
     // 1. Let parts be the result of strictly splitting input on U+002E (.).
     // 2. If the last item in parts is the empty string, then:
@@ -1337,7 +1337,7 @@ fn parseIPv4(input: []const u8) !u32 {
     return ipv4;
 }
 
-// https://url.spec.whatwg.org/#ipv4-number-parser
+/// https://url.spec.whatwg.org/#ipv4-number-parser
 fn parseIPv4Number(input_: []const u8, T: type) !T {
     var input = input_;
     // 1. If input is the empty string, then return failure.
