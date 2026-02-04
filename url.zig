@@ -1050,7 +1050,7 @@ fn parseHost(allocator: std.mem.Allocator, input: []u8, isOpaque: bool) !URL.Hos
 }
 
 /// https://url.spec.whatwg.org/#concept-ipv6-parser
-fn parseIPv6(input: []const u8) !u128 {
+pub fn parseIPv6(input: []const u8) !u128 {
     // 1. Let address be a new IPv6 address whose pieces are all 0.
     var address: [8]u16 = @splat(0);
     _ = &address;
@@ -1286,7 +1286,7 @@ fn endsInANumber(input: []const u8) bool {
 }
 
 /// https://url.spec.whatwg.org/#concept-ipv4-parser
-fn parseIPv4(input: []const u8) !u32 {
+pub fn parseIPv4(input: []const u8) !u32 {
     // 1. Let parts be the result of strictly splitting input on U+002E (.).
     var end = input.len;
     var parts_size = extras.countScalar(u8, input[0..end], '.') + 1;
@@ -1405,18 +1405,18 @@ fn shortenUrlPath(url: *ManyArrayList(15, u8), has_opaque_path: bool) void {
 //
 
 /// https://infra.spec.whatwg.org/#c0-control
-fn is_c0control(c: u8) bool {
+pub fn is_c0control(c: u8) bool {
     if (c >= 0x00 and c <= 0x1F) return true;
     return false;
 }
 /// https://infra.spec.whatwg.org/#c0-control-or-space
-fn is_c0control_or_space(c: u8) bool {
+pub fn is_c0control_or_space(c: u8) bool {
     if (is_c0control(c)) return true;
     if (c == ' ') return true;
     return false;
 }
 /// https://url.spec.whatwg.org/#forbidden-host-code-point
-fn is_forbidden_host_codepoint(c: u8) bool {
+pub fn is_forbidden_host_codepoint(c: u8) bool {
     if (c == 0) return true;
     if (c == '\t') return true;
     if (c == '\n') return true;
@@ -1437,7 +1437,7 @@ fn is_forbidden_host_codepoint(c: u8) bool {
     return false;
 }
 /// https://url.spec.whatwg.org/#forbidden-domain-code-point
-fn is_forbidden_domain_codepoint(c: u8) bool {
+pub fn is_forbidden_domain_codepoint(c: u8) bool {
     if (is_forbidden_host_codepoint(c)) return true;
     if (is_c0control(c)) return true;
     if (c == '%') return true;
@@ -1445,7 +1445,7 @@ fn is_forbidden_domain_codepoint(c: u8) bool {
     return false;
 }
 /// https://url.spec.whatwg.org/#url-code-points
-fn is_url_codepoint(c: u21) bool {
+pub fn is_url_codepoint(c: u21) bool {
     if (c < 128 and std.ascii.isAlphanumeric(@intCast(c))) return true;
     if (c == '!') return true;
     if (c == '$') return true;
@@ -1472,12 +1472,12 @@ fn is_url_codepoint(c: u21) bool {
     return false;
 }
 /// https://url.spec.whatwg.org/#c0-control-percent-encode-set
-fn is_c0control_percent_char(c: u8) bool {
+pub fn is_c0control_percent_char(c: u8) bool {
     if (c >= 0x00 and c <= 0x1F) return true;
     return c > 0x7E;
 }
 /// https://url.spec.whatwg.org/#query-percent-encode-set
-fn is_query_percent_char(c: u8) bool {
+pub fn is_query_percent_char(c: u8) bool {
     if (c == ' ') return true;
     if (c == '"') return true;
     if (c == '#') return true;
@@ -1486,7 +1486,7 @@ fn is_query_percent_char(c: u8) bool {
     return is_c0control_percent_char(c);
 }
 /// https://url.spec.whatwg.org/#path-percent-encode-set
-fn is_path_percent_char(c: u8) bool {
+pub fn is_path_percent_char(c: u8) bool {
     if (c == '?') return true;
     if (c == '^') return true;
     if (c == '`') return true;
@@ -1495,12 +1495,12 @@ fn is_path_percent_char(c: u8) bool {
     return is_query_percent_char(c);
 }
 /// https://url.spec.whatwg.org/#special-query-percent-encode-set
-fn is_special_query_percent_char(c: u8) bool {
+pub fn is_special_query_percent_char(c: u8) bool {
     if (c == '\'') return true;
     return is_query_percent_char(c);
 }
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
-fn is_fragment_percent_char(c: u8) bool {
+pub fn is_fragment_percent_char(c: u8) bool {
     if (c == ' ') return true;
     if (c == '"') return true;
     if (c == '<') return true;
@@ -1509,7 +1509,7 @@ fn is_fragment_percent_char(c: u8) bool {
     return is_c0control_percent_char(c);
 }
 /// https://url.spec.whatwg.org/#userinfo-percent-encode-set
-fn is_userinfo_percent_char(c: u8) bool {
+pub fn is_userinfo_percent_char(c: u8) bool {
     if (c == '/') return true;
     if (c == ':') return true;
     if (c == ';') return true;
