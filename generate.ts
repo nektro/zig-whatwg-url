@@ -130,8 +130,6 @@ for (const c of cases) {
 }
 
 w.write(`\n`);
-// prettier-ignore
-if (false)
 for (const c of cases) {
   if (c.base === null) continue;
   if (c.failure) continue;

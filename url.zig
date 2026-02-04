@@ -16,6 +16,7 @@ pub const URL = struct {
     pathname: []const u8,
     search: []const u8,
     hash: []const u8,
+    has_opaque_path: bool,
 
     pub const HostKind = enum {
         unset,
@@ -36,13 +37,13 @@ pub const URL = struct {
         if (base) |b| {
             const b_url = try parseBasic(alloc, b, null, null);
             defer alloc.free(b_url.href);
-            return parseBasic(alloc, input, b_url, null);
+            return parseBasic(alloc, input, &b_url, null);
         }
-        return parseBasic(alloc, input, if (base) |b| try parseBasic(alloc, b, null, null) else null, null);
+        return parseBasic(alloc, input, null, null);
     }
 
     /// https://url.spec.whatwg.org/#concept-basic-url-parser
-    fn parseBasic(alloc: std.mem.Allocator, input: []const u8, base: ?URL, state_override: ?BasicParserState) error{ InvalidURL, OutOfMemory }!URL {
+    fn parseBasic(alloc: std.mem.Allocator, input: []const u8, base: ?*const URL, state_override: ?BasicParserState) error{ InvalidURL, OutOfMemory }!URL {
         // input is a scalar value string
         if (!std.unicode.utf8ValidateSlice(input)) return error.InvalidURL;
 
@@ -93,6 +94,7 @@ pub const URL = struct {
         var href = ManyArrayList(8 + 7, u8).init(alloc);
         defer href.deinit();
         var hostname_kind: HostKind = .unset;
+        var has_opaque_path = false;
         // scheme
         // :
         // //
@@ -164,9 +166,11 @@ pub const URL = struct {
                         }
                         // 6. Otherwise, if url is special, base is non-null, and base’s scheme is url’s scheme:
                         else if (isSchemeSpecial(href.items(0)) and base != null and std.mem.eql(u8, base.?.scheme(), href.items(0))) {
-                            @panic("TODO");
                             // 1. Assert: base is special (and therefore does not have an opaque path).
+                            std.debug.assert(base.?.isSpecial());
+                            std.debug.assert(!base.?.has_opaque_path);
                             // 2. Set state to special relative or authority state.
+                            state = .special_relative_or_authority;
                         }
                         // 7. Otherwise, if url is special, set state to special authority slashes state.
                         else if (isSchemeSpecial(href.items(0))) {
@@ -182,6 +186,7 @@ pub const URL = struct {
                         // 9. Otherwise, set url’s path to the empty string and set state to opaque path state.
                         else {
                             href.clear(10);
+                            has_opaque_path = true;
                             state = .opaque_path;
                         }
                     }
@@ -192,6 +197,7 @@ pub const URL = struct {
                         pointer = 0;
                         i = 0;
                         c = inputl.items[i];
+                        continue;
                     }
                     // 4. Otherwise, return failure.
                     else {
@@ -200,11 +206,38 @@ pub const URL = struct {
                 },
                 .no_scheme => {
                     // 1. If base is null, or base has an opaque path and c is not U+0023 (#), missing-scheme-non-relative-URL validation error, return failure.
-                    if (base == null) return error.InvalidURL;
+                    if (base == null or (base != null and base.?.has_opaque_path and c != '#')) {
+                        return error.InvalidURL;
+                    }
                     // 2. Otherwise, if base has an opaque path and c is U+0023 (#), set url’s scheme to base’s scheme, url’s path to base’s path, url’s query to base’s query, url’s fragment to the empty string, and set state to fragment state.
+                    else if (base.?.has_opaque_path and c == '#') {
+                        try href.set(0, base.?.scheme());
+                        try href.set(1, ":");
+                        try href.set(7, base.?.hostname);
+                        hostname_kind = base.?.hostname_kind;
+                        try href.set(10, base.?.pathname);
+                        has_opaque_path = base.?.has_opaque_path;
+                        try href.set(12, base.?.query());
+                        try href.set(13, "#");
+                        try href.set(14, "");
+                        state = .fragment;
+                    }
                     // 3. Otherwise, if base’s scheme is not "file", set state to relative state and decrease pointer by 1.
+                    else if (!std.mem.eql(u8, base.?.scheme(), "file")) {
+                        state = .relative;
+                        if (pointer == 0) continue; // pointer goes to -1 then +1'd
+                        pointer -= 1;
+                        i = lastcpi(inputl.items[0..i]);
+                        c = inputl.items[i];
+                    }
                     // 4. Otherwise, set state to file state and decrease pointer by 1.
-                    return error.InvalidURL;
+                    else {
+                        state = .file;
+                        if (pointer == 0) continue; // pointer goes to -1 then +1'd
+                        pointer -= 1;
+                        i = lastcpi(inputl.items[0..i]);
+                        c = inputl.items[i];
+                    }
                 },
                 .special_relative_or_authority => {
                     // 1. If c is U+002F (/) and remaining starts with U+002F (/), then set state to special authority ignore slashes state and increase pointer by 1.
@@ -217,7 +250,9 @@ pub const URL = struct {
                     // 2. Otherwise, special-scheme-missing-following-solidus validation error, set state to relative state and decrease pointer by 1.
                     else {
                         state = .relative;
-                        @panic("TODO");
+                        pointer -= 1;
+                        i = lastcpi(inputl.items[0..i]);
+                        c = inputl.items[i];
                     }
                 },
                 .path_or_authority => {
@@ -231,7 +266,6 @@ pub const URL = struct {
                         pointer -= 1;
                         i = lastcpi(inputl.items[0..i]);
                         c = inputl.items[i];
-                        try href.appendSlice(10, "/");
                     }
                 },
                 .relative => {
@@ -251,12 +285,14 @@ pub const URL = struct {
                     // 5. Otherwise:
                     else {
                         // 1. Set url’s username to base’s username, url’s password to base’s password, url’s host to base’s host, url’s port to base’s port, url’s path to a clone of base’s path, and url’s query to base’s query.
-                        // try username.appendSlice(base.?.username);
-                        // try password.appendSlice(base.?.password);
-                        // host = base.?.host;
-                        // try port.writer().print("{d}", .{base.?.port.?});
-                        // try path.appendSlice(base.?.path);
-                        // try query.appendSlice(base.?.query.?);
+                        try href.set(3, base.?.username);
+                        try href.set(5, base.?.password);
+                        try href.set(7, base.?.hostname);
+                        hostname_kind = base.?.hostname_kind;
+                        try href.set(9, base.?.port);
+                        try href.set(10, base.?.pathname);
+                        has_opaque_path = base.?.has_opaque_path;
+                        try href.set(12, base.?.query());
                         // 2. If c is U+003F (?), then set url’s query to the empty string, and state to query state.
                         if (c == '?') {
                             href.clear(12);
@@ -274,12 +310,13 @@ pub const URL = struct {
                             // 1. Set url’s query to null.
                             href.clear(12);
                             // 2. Shorten url’s path.
-                            @panic("TODO");
+                            shortenUrlPath(&href, has_opaque_path);
                             // 3. Set state to path state and decrease pointer by 1.
-                            // state = .path;
-                            // pointer -= 1;
-                            // i = lastcpi(inputl.items[0..i]);
-                            // c = inputl.items[i];
+                            state = .path;
+                            if (pointer == 0) continue; // pointer goes to -1 then +1'd
+                            pointer -= 1;
+                            i = lastcpi(inputl.items[0..i]);
+                            c = inputl.items[i];
                         }
                     }
                 },
@@ -296,15 +333,16 @@ pub const URL = struct {
                     }
                     // 3. Otherwise, set url’s username to base’s username, url’s password to base’s password, url’s host to base’s host, url’s port to base’s port, state to path state, and then, decrease pointer by 1.
                     else {
-                        // try username.appendSlice(base.?.username);
-                        // try password.appendSlice(base.?.password);
-                        // host = base.?.host;
-                        // try port.writer().print("{d}", .{base.?.port.?});
+                        try href.set(3, base.?.username);
+                        try href.set(5, base.?.password);
+                        try href.set(7, base.?.hostname);
+                        hostname_kind = base.?.hostname_kind;
+                        try href.set(9, base.?.port);
                         state = .path;
+                        if (pointer == 0) continue; // pointer goes to -1 then +1'd
                         pointer -= 1;
                         i = lastcpi(inputl.items[0..i]);
                         c = inputl.items[i];
-                        @panic("TODO");
                     }
                 },
                 .special_authority_slashes => {
@@ -340,6 +378,7 @@ pub const URL = struct {
                     // 1. If c is U+0040 (@), then:
                     if (c == '@') {
                         // 1. Invalid-credentials validation error.
+                        {}
                         // 2. If atSignSeen is true, then prepend "%40" to buffer.
                         if (atSignSeen) try buffer.insertSlice(0, "%40");
                         // 3. Set atSignSeen to true.
@@ -496,9 +535,11 @@ pub const URL = struct {
                     // 4. Otherwise, if base is non-null and base’s scheme is "file":
                     else if (base != null and std.mem.eql(u8, base.?.scheme(), "file")) {
                         // 1. Set url’s host to base’s host, url’s path to a clone of base’s path, and url’s query to base’s query.
-                        // host = base.?.host;
-                        // try path.appendSlice(base.?.path.?);
-                        // try query.appendSlice(base.?.query.?);
+                        try href.set(7, base.?.hostname);
+                        hostname_kind = base.?.hostname_kind;
+                        try href.set(10, base.?.pathname);
+                        has_opaque_path = base.?.has_opaque_path;
+                        try href.set(12, base.?.query());
                         // 2. If c is U+003F (?), then set url’s query to the empty string and state to query state.
                         if (c == '?') {
                             href.clear(12);
@@ -516,15 +557,20 @@ pub const URL = struct {
                             // 1. Set url’s query to null.
                             href.clear(12);
                             // 2. If the code point substring from pointer to the end of input does not start with a Windows drive letter, then shorten url’s path.
+                            if (!startsWithWindowsDriveLetter(inputl.items[i..])) {
+                                shortenUrlPath(&href, has_opaque_path);
+                            }
                             // 3. Otherwise:
                             // This is a (platform-independent) Windows drive letter quirk.
-                            if (builtin.target.os.tag == .windows) @compileError("TODO");
-                            {
+                            else {
                                 // 1. File-invalid-Windows-drive-letter validation error.
+                                {}
                                 // 2. Set url’s path to « ».
+                                href.clear(10);
                             }
                             // 4. Set state to path state and decrease pointer by 1.
                             state = .path;
+                            if (pointer == 0) continue; // pointer goes to -1 then +1'd
                             pointer -= 1;
                             i = lastcpi(inputl.items[0..i]);
                             c = inputl.items[i];
@@ -536,7 +582,6 @@ pub const URL = struct {
                         pointer -= 1;
                         i = lastcpi(inputl.items[0..i]);
                         c = inputl.items[i];
-                        try href.appendSlice(10, "/");
                     }
                 },
                 .file_slash => {
@@ -552,17 +597,24 @@ pub const URL = struct {
                         // 1. If base is non-null and base’s scheme is "file", then:
                         if (base != null and std.mem.eql(u8, base.?.scheme(), "file")) {
                             // 1. Set url’s host to base’s host.
-                            // host = base.?.host;
+                            try href.set(7, base.?.hostname);
+                            hostname_kind = base.?.hostname_kind;
                             // 2. If the code point substring from pointer to the end of input does not start with a Windows drive letter and base’s path[0] is a normalized Windows drive letter, then append base’s path[0] to url’s path.
                             // > This is a (platform-independent) Windows drive letter quirk.
-                            if (builtin.target.os.tag == .windows) @compileError("TODO");
+                            if (!startsWithWindowsDriveLetter(inputl.items[i..])) {
+                                const base_path0 = nthScalarItem(u8, base.?.pathname, '/', 1);
+                                if (isNormalizedWindowsDriveLetter(base_path0)) {
+                                    try href.appendSlice(10, "/");
+                                    try href.appendSlice(10, base_path0);
+                                }
+                            }
                         }
                         // 2. Set state to path state, and decrease pointer by 1.
                         state = .path;
+                        if (pointer == 0) continue; // pointer goes to -1 then +1'd
                         pointer -= 1;
                         i = lastcpi(inputl.items[0..i]);
                         c = inputl.items[i];
-                        try href.appendSlice(10, "/");
                     }
                 },
                 .file_host => {
@@ -575,7 +627,6 @@ pub const URL = struct {
                         // > This is a (platform-independent) Windows drive letter quirk. buffer is not reset here and instead used in the path state.
                         if (state_override == null and isWindowsDriveLetter(buffer.items)) {
                             state = .path;
-                            try href.appendSlice(10, "/");
                         }
                         // 2. Otherwise, if buffer is the empty string, then:
                         else if (buffer.items.len == 0) {
@@ -626,7 +677,6 @@ pub const URL = struct {
                             i = lastcpi(inputl.items[0..i]);
                             c = inputl.items[i];
                         }
-                        try href.appendSlice(10, "/");
                     }
                     // 2. Otherwise, if state override is not given and c is U+003F (?), set url’s query to the empty string and state to query state.
                     else if (state_override == null and c == '?') {
@@ -649,8 +699,6 @@ pub const URL = struct {
                             pointer -= 1;
                             i = lastcpi(inputl.items[0..i]);
                             c = inputl.items[i];
-                        } else {
-                            try href.appendSlice(10, &.{c});
                         }
                     }
                     // 5. Otherwise, if state override is given and url’s host is null, append the empty string to url’s path.
@@ -671,29 +719,28 @@ pub const URL = struct {
                         {}
                         // 2. If buffer is a double-dot URL path segment, then:
                         if (isDoubleDotPathSeg(buffer.items)) {
-                            const olen = href.lengths[10];
-                            const idx = std.mem.lastIndexOfScalar(u8, href.items(10)[0 .. olen - 1], '/') orelse 0;
-                            try href.replace(10, idx + 1, olen - idx - 1, "");
                             // 1. Shorten url’s path.
+                            shortenUrlPath(&href, has_opaque_path);
                             // 2. If neither c is U+002F (/), nor url is special and c is U+005C (\), append the empty string to url’s path.
                             // > This means that for input /usr/.. the result is / and not a lack of a path.
+                            if (!is_lsep and !is_rsep) {
+                                try href.appendSlice(10, "/");
+                            }
                         }
                         // 3. Otherwise, if buffer is a single-dot URL path segment and if neither c is U+002F (/), nor url is special and c is U+005C (\), append the empty string to url’s path.
-                        else if (isSingleDotPathSeg(buffer.items) and (c != '/' or !(is_rsep))) {
-                            // =no action needed
+                        else if (isSingleDotPathSeg(buffer.items) and !is_lsep and !is_rsep) {
+                            try href.appendSlice(10, "/");
                         }
                         // 4. Otherwise, if buffer is not a single-dot URL path segment, then:
                         else if (!isSingleDotPathSeg(buffer.items)) {
                             // 1. If url’s scheme is "file", url’s path is empty, and buffer is a Windows drive letter, then replace the second code point in buffer with U+003A (:).
                             // > This is a (platform-independent) Windows drive letter quirk.
-                            if (std.mem.eql(u8, href.items(0), "file") and href.lengths[10] <= 1 and isWindowsDriveLetter(buffer.items)) {
+                            if (std.mem.eql(u8, href.items(0), "file") and href.lengths[10] == 0 and isWindowsDriveLetter(buffer.items)) {
                                 buffer.items[1] = ':';
                             }
                             // 2. Append buffer to url’s path.
-                            // if (!std.mem.endsWith(u8, href.items(10), "/")) try href.appendSlice(10, "/");
+                            try href.appendSlice(10, "/");
                             try href.appendSlice(10, buffer.items);
-                            if (is_lsep) try href.appendSlice(10, "/");
-                            if (is_rsep) try href.appendSlice(10, "/");
                         }
                         // 5. Set buffer to the empty string.
                         buffer.clearRetainingCapacity();
@@ -766,6 +813,7 @@ pub const URL = struct {
                     //  - url is not special
                     //  - url’s scheme is "ws" or "wss"
                     // then set encoding to UTF-8.
+                    {}
                     // 2. If one of the following is true:
                     //  - state override is not given and c is U+0023 (#)
                     //  - c is the EOF code point
@@ -812,14 +860,10 @@ pub const URL = struct {
             }
 
             // If after a run pointer points to the EOF code point, go to the next step. Otherwise, increase pointer by 1 and continue with the state machine.
-            if (i == length) {
-                if (state == .fragment) break;
-                state = @enumFromInt(@intFromEnum(state) + 1);
-            } else {
-                i += l(c);
-                c = if (i < length) inputl.items[i] else 0;
-                pointer += 1;
-            }
+            if (i == length) break;
+            i += l(c);
+            c = if (i < length) inputl.items[i] else 0;
+            pointer += 1;
         }
 
         if (hostname_kind != .unset) {
@@ -833,6 +877,12 @@ pub const URL = struct {
         }
         if (href.lengths[9] > 0) {
             try href.set(8, ":");
+        }
+        if (href.lengths[12] > 0) {
+            try href.set(11, "?");
+        }
+        if (href.lengths[14] > 0) {
+            try href.set(13, "#");
         }
 
         var path_offset: usize = 0;
@@ -855,6 +905,7 @@ pub const URL = struct {
             .pathname = _href[extras.sum(usize, href.lengths[0..10])..][0..href.lengths[10]][path_offset..],
             .search = if (href.lengths[12] == 0) "" else _href[extras.sum(usize, href.lengths[0..11])..][0..extras.sum(usize, href.lengths[11..][0..2])],
             .hash = if (href.lengths[14] == 0) "" else _href[extras.sum(usize, href.lengths[0..13])..][0..extras.sum(usize, href.lengths[13..][0..2])],
+            .has_opaque_path = has_opaque_path,
         };
         return url;
     }
@@ -889,6 +940,16 @@ pub const URL = struct {
 
     pub fn scheme(u: *const URL) []const u8 {
         return u.protocol[0 .. u.protocol.len - 1];
+    }
+
+    pub fn query(u: *const URL) []const u8 {
+        if (u.search.len == 0) return "";
+        return u.search[1..]; // search includes '?'
+    }
+
+    pub fn fragment(u: *const URL) []const u8 {
+        if (u.hash.len == 0) return "";
+        return u.hash[1..]; // hash includes '#'
     }
 };
 
@@ -938,6 +999,24 @@ fn isWindowsDriveLetter(buffer: []const u8) bool {
     return true;
 }
 
+/// https://url.spec.whatwg.org/#normalized-windows-drive-letter
+fn isNormalizedWindowsDriveLetter(buffer: []const u8) bool {
+    if (buffer.len != 2) return false;
+    if (!std.ascii.isAlphabetic(buffer[0])) return false;
+    if (!(buffer[1] == ':')) return false;
+    return true;
+}
+
+/// https://url.spec.whatwg.org/#start-with-a-windows-drive-letter
+fn startsWithWindowsDriveLetter(buffer: []const u8) bool {
+    if (buffer.len < 2) return false;
+    if (!std.ascii.isAlphabetic(buffer[0])) return false;
+    if (!(buffer[1] == ':' or buffer[1] == '|')) return false;
+    if (buffer.len == 2) return true;
+    if (!(buffer[2] == '/' or buffer[2] == '\\' or buffer[2] == '?' or buffer[2] == '#')) return false;
+    return true;
+}
+
 /// https://url.spec.whatwg.org/#concept-host-parser
 fn parseHost(allocator: std.mem.Allocator, input: []u8, isOpaque: bool) !URL.Host {
     // 1. If input starts with U+005B ([), then:
@@ -963,7 +1042,7 @@ fn parseHost(allocator: std.mem.Allocator, input: []u8, isOpaque: bool) !URL.Hos
     // 7. If asciiDomain ends in a number, then return the result of IPv4 parsing asciiDomain.
     if (endsInANumber(asciidomain)) {
         defer allocator.free(asciidomain);
-        const adr = try parseIPv4(input);
+        const adr = try parseIPv4(asciidomain);
         return .{ .ipv4 = adr };
     }
     // 8. Return asciiDomain.
@@ -1031,7 +1110,7 @@ fn parseIPv6(input: []const u8) !u128 {
             // 4. Let numbersSeen be 0.
             var numbersSeen: usize = 0;
             // 5. While c is not the EOF code point:
-            if (pointer < input.len) {
+            while (pointer < input.len) {
                 // 1. Let ipv4Piece be null.
                 var ipv4Piece: ?u16 = null;
                 // 2. If numbersSeen is greater than 0, then:
@@ -1046,9 +1125,9 @@ fn parseIPv6(input: []const u8) !u128 {
                     }
                 }
                 // 3. If c is not an ASCII digit, IPv4-in-IPv6-invalid-code-point validation error, return failure.
-                if (!std.ascii.isDigit(input[pointer])) return error.InvalidURL;
+                if (pointer == input.len or !std.ascii.isDigit(input[pointer])) return error.InvalidURL;
                 // 4. While c is an ASCII digit:
-                while (std.ascii.isDigit(input[pointer])) {
+                while (pointer < input.len and std.ascii.isDigit(input[pointer])) {
                     // 1. Let number be c interpreted as decimal number.
                     const dec_alpha = "0123456789";
                     const number: u8 = @intCast(std.mem.indexOfScalar(u8, dec_alpha, input[pointer]).?);
@@ -1196,7 +1275,7 @@ fn endsInANumber(input: []const u8) bool {
     var end = input.len;
     var start: usize = if (std.mem.lastIndexOfScalar(u8, input[0..end], '.')) |i| i + 1 else 0;
     if (end - start == 0) {
-        if (std.mem.count(u8, input, ".") == 0) return false;
+        if (extras.countScalar(u8, input, '.') == 0) return false;
         end = start - 1;
         start = if (std.mem.lastIndexOfScalar(u8, input[0..end], '.')) |i| i + 1 else 0;
     }
@@ -1210,7 +1289,7 @@ fn endsInANumber(input: []const u8) bool {
 fn parseIPv4(input: []const u8) !u32 {
     // 1. Let parts be the result of strictly splitting input on U+002E (.).
     var end = input.len;
-    var parts_size = std.mem.count(u8, input[0..end], ".") + 1;
+    var parts_size = extras.countScalar(u8, input[0..end], '.') + 1;
     // 2. If the last item in parts is the empty string, then:
     if (std.mem.endsWith(u8, input, ".")) {
         // 1. IPv4-empty-part validation error.
@@ -1303,6 +1382,21 @@ fn parseIPv4Number(input_: []const u8, T: type) !T {
     if (T == void) return;
     const output = std.fmt.parseInt(T, input, radix) catch return error.Invalid;
     return output;
+}
+
+/// https://url.spec.whatwg.org/#shorten-a-urls-path
+fn shortenUrlPath(url: *ManyArrayList(15, u8), has_opaque_path: bool) void {
+    // 1. Assert: url does not have an opaque path.
+    std.debug.assert(!has_opaque_path);
+    // 2. Let path be url’s path.
+    const path = url.items(10);
+    // 3. If url’s scheme is "file", path’s size is 1, and path[0] is a normalized Windows drive letter, then return.
+    if (std.mem.eql(u8, url.items(0), "file") and extras.countScalar(u8, path, '/') == 1 and isNormalizedWindowsDriveLetter(nthScalarItem(u8, path, '/', 1))) {
+        return;
+    }
+    // 4. Remove path’s last item, if any.
+    const new_len = std.mem.lastIndexOfScalar(u8, path, '/') orelse return;
+    url.replace(10, new_len, path.len - new_len, "") catch unreachable;
 }
 
 //
@@ -1561,6 +1655,12 @@ pub fn replaceInPlace(comptime T: type, input: []T, needle: []const T, replaceme
         replacements += 1;
     }
     return replacements;
+}
+fn nthScalarItem(T: type, haystack: []const u8, needle: T, index: usize) []const T {
+    var it = std.mem.splitScalar(T, haystack, needle);
+    var idx: usize = 0;
+    while (idx < index) : (idx += 1) _ = it.next().?;
+    return it.next().?;
 }
 
 pub fn ManyArrayList(N: usize, T: type) type {
