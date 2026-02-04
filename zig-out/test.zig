@@ -875,6 +875,8 @@ test { try parsePass("/c:/foo/bar", "file:///c:/baz/qux", "file:///c:/foo/bar", 
 test { try parsePass("/c|/foo/bar", "file:///c:/baz/qux", "file:///c:/foo/bar", "", "file:", "", "", "", "", "", "/c:/foo/bar", "", ""); }
 test { try parsePass("file:\\c:\\foo\\bar", "file:///c:/baz/qux", "file:///c:/foo/bar", "", "file:", "", "", "", "", "", "/c:/foo/bar", "", ""); }
 test { try parsePass("/c:/foo/bar", "file://host/path", "file://host/c:/foo/bar", "", "file:", "", "", "host", "host", "", "/c:/foo/bar", "", ""); }
+test { try parsePass("..", "abc://x/y/z/C:/", "abc://x/y/z/", "", "abc:", "", "", "x", "x", "", "/y/z/", "", ""); }
+test { try parsePass("..", "file://x/C:/", "file://x/C:/", "", "file:", "", "", "x", "x", "", "/C:/", "", ""); }
 test { try parsePass("C|/", "file://host/", "file://host/C:/", "", "file:", "", "", "host", "host", "", "/C:/", "", ""); }
 test { try parsePass("/C:/", "file://host/", "file://host/C:/", "", "file:", "", "", "host", "host", "", "/C:/", "", ""); }
 test { try parsePass("file:C:/", "file://host/", "file://host/C:/", "", "file:", "", "", "host", "host", "", "/C:/", "", ""); }
