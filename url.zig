@@ -960,6 +960,18 @@ pub const URL = struct {
             .ipv6 => .{ .ipv6 = parseIPv6(u.hostname[1 .. u.hostname.len - 1]) catch unreachable },
         };
     }
+
+    pub fn portFancy(u: *const URL) ?u16 {
+        if (u.port.len > 0) return std.fmt.parseUnsigned(u16, u.port, 10) catch unreachable;
+        const s = u.scheme();
+        if (std.mem.eql(u8, s, "ftp")) return 21;
+        if (std.mem.eql(u8, s, "file")) return null;
+        if (std.mem.eql(u8, s, "http")) return 80;
+        if (std.mem.eql(u8, s, "https")) return 443;
+        if (std.mem.eql(u8, s, "ws")) return 80;
+        if (std.mem.eql(u8, s, "wss")) return 443;
+        return null;
+    }
 };
 
 /// https://url.spec.whatwg.org/#special-scheme
