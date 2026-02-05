@@ -1334,7 +1334,7 @@ pub fn parseIPv4(input: []const u8) !u32 {
         // 2. Increment counter by 1.
     }
     // 13. Return ipv4.
-    return ipv4;
+    return @byteSwap(ipv4);
 }
 
 /// https://url.spec.whatwg.org/#ipv4-number-parser
@@ -1597,7 +1597,7 @@ fn setHost(href: *ManyArrayList(15, u8), h: URL.Host) !void {
         },
         .ipv4 => {
             const bytes: [4]u8 = @bitCast(h.ipv4);
-            try href.print(7, "{d}.{d}.{d}.{d}", .{ bytes[3], bytes[2], bytes[1], bytes[0] });
+            try href.print(7, "{d}.{d}.{d}.{d}", .{ bytes[0], bytes[1], bytes[2], bytes[3] });
         },
         .ipv6 => {
             const pieces: [8]u16 = @bitCast(h.ipv6);
