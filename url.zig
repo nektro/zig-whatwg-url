@@ -951,6 +951,15 @@ pub const URL = struct {
         if (u.hash.len == 0) return "";
         return u.hash[1..]; // hash includes '#'
     }
+
+    pub fn hostFancy(u: *const URL) Host {
+        return switch (u.hostname_kind) {
+            .unset => .{ .unset = {} },
+            .name => .{ .name = u.hostname },
+            .ipv4 => .{ .ipv4 = parseIPv4(u.hostname) catch unreachable },
+            .ipv6 => .{ .ipv6 = parseIPv6(u.hostname[1 .. u.hostname.len - 1]) catch unreachable },
+        };
+    }
 };
 
 /// https://url.spec.whatwg.org/#special-scheme
