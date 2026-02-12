@@ -497,7 +497,7 @@ pub const URL = struct {
                         if (buffer.items.len > 0) {
                             // 1. Let port be the mathematical integer value that is represented by buffer in radix-10 using ASCII digits for digits with values 0 through 9.
                             // 2. If port is not a 16-bit unsigned integer, port-out-of-range validation error, return failure.
-                            const p = std.fmt.parseInt(u16, buffer.items, 10) catch return error.InvalidURL;
+                            const p = extras.parseDigits(u16, buffer.items, 10) catch return error.InvalidURL;
                             // 3. Set url’s port to null, if port is url’s scheme’s default port; otherwise to port.
                             if (schemeDefaultPort(href.items(0)) != p) try href.print(9, "{d}", .{p});
                             // 4. Set buffer to the empty string.
@@ -962,7 +962,7 @@ pub const URL = struct {
     }
 
     pub fn portFancy(u: *const URL) ?u16 {
-        if (u.port.len > 0) return std.fmt.parseUnsigned(u16, u.port, 10) catch unreachable;
+        if (u.port.len > 0) return extras.parseDigits(u16, u.port, 10) catch unreachable;
         const s = u.scheme();
         if (std.mem.eql(u8, s, "ftp")) return 21;
         if (std.mem.eql(u8, s, "file")) return null;
@@ -1250,7 +1250,7 @@ fn percentDecode(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
         if (input[i] == '%') {
             if (input.len >= i + 1 + 2) {
                 if (std.ascii.isHex(input[i + 1]) and std.ascii.isHex(input[i + 2])) {
-                    try result.append(std.fmt.parseInt(u8, input[i + 1 ..][0..2], 16) catch unreachable);
+                    try result.append(extras.parseDigits(u8, input[i + 1 ..][0..2], 16) catch unreachable);
                     i += 2;
                     continue;
                 }
@@ -1401,7 +1401,7 @@ fn parseIPv4Number(input_: []const u8, T: type) !T {
     // 8. Let output be the mathematical integer value that is represented by input in radix-R notation, using ASCII hex digits for digits with values 0 through 15.
     // 9. Return (output, validationError).
     if (T == void) return;
-    const output = std.fmt.parseInt(T, input, radix) catch return error.Invalid;
+    const output = extras.parseDigits(T, input, radix) catch return error.Invalid;
     return output;
 }
 
