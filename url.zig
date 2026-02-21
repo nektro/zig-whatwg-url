@@ -1563,7 +1563,7 @@ fn lastcpi(haystack: []const u8) usize {
     while (haystack[i] & 0xC0 == 0x80) : (i -= 1) {}
     return i;
 }
-fn percentEncodeScalarAL(list: *std.ArrayList(u8), cp: []const u8, comptime set: fn (u8) bool) !void {
+pub fn percentEncodeScalarAL(list: *std.ArrayList(u8), cp: []const u8, comptime set: fn (u8) bool) !void {
     if (set(cp[0])) {
         for (cp) |b| {
             try list.append('%');
@@ -1573,7 +1573,7 @@ fn percentEncodeScalarAL(list: *std.ArrayList(u8), cp: []const u8, comptime set:
         try list.append(cp[0]);
     }
 }
-fn percentEncodeAL(list: *std.ArrayList(u8), input: []const u8, comptime set: fn (u8) bool) !void {
+pub fn percentEncodeAL(list: *std.ArrayList(u8), input: []const u8, comptime set: fn (u8) bool) !void {
     var it = std.unicode.Utf8View.initUnchecked(input).iterator();
     while (it.nextCodepointSlice()) |sl| {
         if (set(sl[0])) {
@@ -1659,7 +1659,7 @@ fn setHost(href: *ManyArrayList(15, u8), h: URL.Host) !void {
         },
     }
 }
-pub fn replaceInPlace(comptime T: type, input: []T, needle: []const T, replacement: []const T) usize {
+fn replaceInPlace(comptime T: type, input: []T, needle: []const T, replacement: []const T) usize {
     // Empty needle will loop until output buffer overflows.
     std.debug.assert(needle.len > 0);
     std.debug.assert(needle.len >= replacement.len);
