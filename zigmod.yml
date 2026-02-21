@@ -4,7 +4,6 @@ main: url.zig
 license: MPL-2.0
 description: A WHATWG URL-compatible parser for Zig
 dependencies:
-  - src: git https://github.com/nektro/zig-net
   - src: git https://github.com/nektro/zig-extras
   - src: git https://github.com/nektro/zig-unicode-idna
 root_dependencies:

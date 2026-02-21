@@ -1,6 +1,5 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const net = @import("net");
 const extras = @import("extras");
 const unicode_idna = @import("unicode-idna");
 
