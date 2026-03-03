@@ -1151,7 +1151,7 @@ pub const SearchParams = struct {
         return list.toOwnedSlice();
     }
 
-    fn IteratorFor(comptime field: string) type {
+    pub fn IteratorFor(comptime field: string) type {
         return struct {
             raw: RawIterator,
 
