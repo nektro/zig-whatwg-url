@@ -971,6 +971,10 @@ pub const URL = struct {
         if (std.mem.eql(u8, s, "wss")) return 443;
         return null;
     }
+
+    pub fn searchParams(u: *const URL, allocator: std.mem.Allocator) !SearchParams {
+        return .initFromString(allocator, u.query());
+    }
 };
 
 pub const SearchParams = struct {
@@ -996,6 +1000,11 @@ pub const SearchParams = struct {
             try uv.append(k, v);
         }
         return uv;
+    }
+
+    pub fn deinit(self: *SearchParams) void {
+        for (self.inner.items(.value)) |x| self.allocator.free(x);
+        self.inner.clearAndFree(self.allocator);
     }
 
     const RawIterator = struct {
