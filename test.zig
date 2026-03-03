@@ -4,3 +4,7 @@ const url = @import("url");
 test {
     _ = @import("./zig-out/test.zig");
 }
+
+test {
+    _ = @import("./test.SearchParams.zig");
+}
