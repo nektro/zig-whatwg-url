@@ -42,7 +42,8 @@ pub const URL = struct {
     }
 
     /// https://url.spec.whatwg.org/#concept-basic-url-parser
-    fn parseBasic(alloc: std.mem.Allocator, input: []const u8, base: ?*const URL, state_override: ?BasicParserState) error{ InvalidURL, OutOfMemory }!URL {
+    pub fn parseBasic(alloc: std.mem.Allocator, input: []const u8, base: ?*const URL, state_override: ?BasicParserState) error{ InvalidURL, OutOfMemory }!URL {
+        std.debug.assert(state_override == null); // TODO:
         // input is a scalar value string
         if (!std.unicode.utf8ValidateSlice(input)) return error.InvalidURL;
 
