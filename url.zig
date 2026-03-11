@@ -1466,7 +1466,7 @@ fn percentEncode(allocator: std.mem.Allocator, input: []const u8, comptime set: 
 }
 
 /// https://url.spec.whatwg.org/#string-percent-decode
-fn percentDecode(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
+pub fn percentDecode(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
     var result = std.ArrayList(u8).init(allocator);
     errdefer result.deinit();
     try result.ensureUnusedCapacity(input.len);
