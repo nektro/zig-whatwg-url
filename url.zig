@@ -1470,20 +1470,23 @@ pub fn percentDecode(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
     var result = std.ArrayList(u8).init(allocator);
     errdefer result.deinit();
     try result.ensureUnusedCapacity(input.len);
+    try percentDecodeW(result.writer(), input);
+    return result.toOwnedSlice();
+}
+pub fn percentDecodeW(writer: anytype, input: []const u8) !void {
     var i: usize = 0;
     while (i < input.len) : (i += 1) {
         if (input[i] == '%') {
             if (input.len >= i + 1 + 2) {
                 if (std.ascii.isHex(input[i + 1]) and std.ascii.isHex(input[i + 2])) {
-                    try result.append(extras.parseDigits(u8, input[i + 1 ..][0..2], 16) catch unreachable);
+                    try writer.writeAll(&.{extras.parseDigits(u8, input[i + 1 ..][0..2], 16) catch unreachable});
                     i += 2;
                     continue;
                 }
             }
         }
-        try result.append(input[i]);
+        try writer.writeAll(&.{input[i]});
     }
-    return result.toOwnedSlice();
 }
 
 /// https://url.spec.whatwg.org/#concept-domain-to-ascii
@@ -1797,6 +1800,19 @@ pub fn percentEncodeScalarAL(list: *std.ArrayList(u8), cp: []const u8, comptime 
         }
     } else {
         try list.append(cp[0]);
+    }
+}
+pub fn percentEncodeW(writer: anytype, input: []const u8, comptime set: fn (u8) bool) !void {
+    var it = std.unicode.Utf8View.initUnchecked(input).iterator();
+    while (it.nextCodepointSlice()) |sl| {
+        if (set(sl[0])) {
+            for (sl) |b| {
+                try writer.writeAll(&.{'%'});
+                try writer.print("{X:0>2}", .{b});
+            }
+        } else {
+            try writer.writeAll(sl);
+        }
     }
 }
 pub fn percentEncodeAL(list: *std.ArrayList(u8), input: []const u8, comptime set: fn (u8) bool) !void {
