@@ -456,6 +456,8 @@ test { try parsePass("sc://fa\xc3\x9f.ExAmPlE/", null, "sc://fa%C3%9F.ExAmPlE/",
 test { try parsePass("http://./", null, "http://./", "http://.", "http:", "", "", ".", ".", "", "/", "", ""); }
 test { try parsePass("http://../", null, "http://../", "http://..", "http:", "", "", "..", "..", "", "/", "", ""); }
 test { try parsePass("h://.", null, "h://.", "null", "h:", "", "", ".", ".", "", "", "", ""); }
+test { try parsePass("https://localhost?q=\xf0\x9f\x94\xa5", null, "https://localhost/?q=%F0%9F%94%A5", "https://localhost", "https:", "", "", "localhost", "localhost", "", "/", "?q=%F0%9F%94%A5", ""); }
+test { try parsePass("https://localhost#\xf0\x9f\x94\xa5", null, "https://localhost/#%F0%9F%94%A5", "https://localhost", "https:", "", "", "localhost", "localhost", "", "/", "", "#%F0%9F%94%A5"); }
 test { try parsePass("http://host/?'", null, "http://host/?%27", "http://host", "http:", "", "", "host", "host", "", "/", "?%27", ""); }
 test { try parsePass("notspecial://host/?'", null, "notspecial://host/?'", "null", "notspecial:", "", "", "host", "host", "", "/", "?'", ""); }
 test { try parsePass("about:/../", null, "about:/", "null", "about:", "", "", "", "", "", "/", "", ""); }
@@ -491,6 +493,7 @@ test { try parsePass("http://foo.bar/baz?qux#foo`bar", null, "http://foo.bar/baz
 test { try parsePass("https://0x.0x.0", null, "https://0.0.0.0/", "https://0.0.0.0", "https:", "", "", "0.0.0.0", "0.0.0.0", "", "/", "", ""); }
 test { try parsePass("https://0x.0x.0x.0x", null, "https://0.0.0.0/", "https://0.0.0.0", "https:", "", "", "0.0.0.0", "0.0.0.0", "", "/", "", ""); }
 test { try parsePass("https://00.00.00.00", null, "https://0.0.0.0/", "https://0.0.0.0", "https:", "", "", "0.0.0.0", "0.0.0.0", "", "/", "", ""); }
+test { try parsePass("https://0000000000000000000000000000000000000000177.0.0.1", null, "https://127.0.0.1/", "https://127.0.0.1", "https:", "", "", "127.0.0.1", "127.0.0.1", "", "/", "", ""); }
 test { try parsePass("file:///C%3A/", null, "file:///C%3A/", "", "file:", "", "", "", "", "", "/C%3A/", "", ""); }
 test { try parsePass("file:///C%7C/", null, "file:///C%7C/", "", "file:", "", "", "", "", "", "/C%7C/", "", ""); }
 test { try parsePass("asdf://%43%7C/", null, "asdf://%43%7C/", "null", "asdf:", "", "", "%43%7C", "%43%7C", "", "/", "", ""); }
@@ -657,6 +660,10 @@ test { try parsePass("non-special:\\\\opaque\\path", null, "non-special:\\\\opaq
 test { try parsePass("non-special:\\/opaque", null, "non-special:\\/opaque", "null", "non-special:", "", "", "", "", "", "\\/opaque", "", ""); }
 test { try parsePass("non-special:/\\path", null, "non-special:/\\path", "null", "non-special:", "", "", "", "", "", "/\\path", "", ""); }
 test { try parsePass("non-special://host/a\\b", null, "non-special://host/a\\b", "null", "non-special:", "", "", "host", "host", "", "/a\\b", "", ""); }
+test { try parsePass("data:text/plain,test#<foo> <bar>", null, "data:text/plain,test#%3Cfoo%3E%20%3Cbar%3E", "", "data:", "", "", "", "", "", "text/plain,test", "", "#%3Cfoo%3E%20%3Cbar%3E"); }
+test { try parsePass("about:blank#<foo> <bar>", null, "about:blank#%3Cfoo%3E%20%3Cbar%3E", "", "about:", "", "", "", "", "", "blank", "", "#%3Cfoo%3E%20%3Cbar%3E"); }
+test { try parsePass("data:text/plain,test#\x00\x01\t\n\r\x1f !\"#$%&'()*+,-./09:;<=>?@AZ[\\]^_`az{|}~\x7f\xc2\x80\xc2\x81\xc3\x89\xc3\xa9", null, "data:text/plain,test#%00%01%1F%20!%22#$%&'()*+,-./09:;%3C=%3E?@AZ[\\]^_%60az{|}~%7F%C2%80%C2%81%C3%89%C3%A9", "", "data:", "", "", "", "", "", "text/plain,test", "", "#%00%01%1F%20!%22#$%&'()*+,-./09:;%3C=%3E?@AZ[\\]^_%60az{|}~%7F%C2%80%C2%81%C3%89%C3%A9"); }
+test { try parsePass("about:blank#\x00\x01\t\n\r\x1f !\"#$%&'()*+,-./09:;<=>?@AZ[\\]^_`az{|}~\x7f\xc2\x80\xc2\x81\xc3\x89\xc3\xa9", null, "about:blank#%00%01%1F%20!%22#$%&'()*+,-./09:;%3C=%3E?@AZ[\\]^_%60az{|}~%7F%C2%80%C2%81%C3%89%C3%A9", "", "about:", "", "", "", "", "", "blank", "", "#%00%01%1F%20!%22#$%&'()*+,-./09:;%3C=%3E?@AZ[\\]^_%60az{|}~%7F%C2%80%C2%81%C3%89%C3%A9"); }
 
 test { try parsePass("http://example\t.\norg", "http://example.org/foo/bar", "http://example.org/", "http://example.org", "http:", "", "", "example.org", "example.org", "", "/", "", ""); }
 test { try parsePass("http://user:pass@foo:21/bar;par?b#c", "http://example.org/foo/bar", "http://user:pass@foo:21/bar;par?b#c", "http://foo:21", "http:", "user", "pass", "foo:21", "foo", "21", "/bar;par", "?b", "#c"); }
@@ -717,6 +724,7 @@ test { try parsePass("http://[::127.0.0.1]", "http://example.org/foo/bar", "http
 test { try parsePass("http://[0:0:0:0:0:0:13.1.68.3]", "http://example.org/foo/bar", "http://[::d01:4403]/", "http://[::d01:4403]", "http:", "", "", "[::d01:4403]", "[::d01:4403]", "", "/", "", ""); }
 test { try parsePass("http://[2001::1]:80", "http://example.org/foo/bar", "http://[2001::1]/", "http://[2001::1]", "http:", "", "", "[2001::1]", "[2001::1]", "", "/", "", ""); }
 test { try parsePass("http:/example.com/", "http://example.org/foo/bar", "http://example.org/example.com/", "http://example.org", "http:", "", "", "example.org", "example.org", "", "/example.com/", "", ""); }
+test { try parsePass("http:/", "http://example.com/", "http://example.com/", "http://example.com", "http:", "", "", "example.com", "example.com", "", "/", "", ""); }
 test { try parsePass("ftp:/example.com/", "http://example.org/foo/bar", "ftp://example.com/", "ftp://example.com", "ftp:", "", "", "example.com", "example.com", "", "/", "", ""); }
 test { try parsePass("https:/example.com/", "http://example.org/foo/bar", "https://example.com/", "https://example.com", "https:", "", "", "example.com", "example.com", "", "/", "", ""); }
 test { try parsePass("madeupscheme:/example.com/", "http://example.org/foo/bar", "madeupscheme:/example.com/", "null", "madeupscheme:", "", "", "", "", "", "/example.com/", "", ""); }
@@ -928,6 +936,9 @@ test { try parsePass("/\\/\\//example.org/../path", "http://example.org/", "http
 test { try parsePass("///abcdef/../", "file:///", "file:///", "", "file:", "", "", "", "", "", "/", "", ""); }
 test { try parsePass("/\\//\\/a/../", "file:///", "file://////", "", "file:", "", "", "", "", "", "////", "", ""); }
 test { try parsePass("//a/../", "file:///", "file://a/", "", "file:", "", "", "a", "a", "", "/", "", ""); }
+test { try parsePass("\\a", "foo://foo/a", "foo://foo/\\a", "", "foo:", "", "", "foo", "foo", "", "/\\a", "", ""); }
+test { try parsePass("\\/a", "foo://foo/a", "foo://foo/\\/a", "", "foo:", "", "", "foo", "foo", "", "/\\/a", "", ""); }
+test { try parsePass("\\\\a", "foo://foo/a", "foo://foo/\\\\a", "", "foo:", "", "", "foo", "foo", "", "/\\\\a", "", ""); }
 
 test { try parseIDNAFail("a\xe2\x80\x8cb"); }
 test { try parseIDNAFail("A\xe2\x80\x8cB"); }
