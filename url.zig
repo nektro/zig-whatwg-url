@@ -47,7 +47,7 @@ pub const URL = struct {
         // input is a scalar value string
         if (!std.unicode.utf8ValidateSlice(input)) return error.InvalidURL;
 
-        var inputl = std.ArrayList(u8).init(alloc);
+        var inputl = std.array_list.Managed(u8).init(alloc);
         defer inputl.deinit();
         try inputl.appendSlice(input);
 
@@ -70,7 +70,7 @@ pub const URL = struct {
         // we always do utf-8
 
         // 6.
-        var buffer = std.ArrayList(u8).init(alloc);
+        var buffer = std.array_list.Managed(u8).init(alloc);
         defer buffer.deinit();
 
         // 7.
@@ -1138,9 +1138,9 @@ pub const SearchParams = struct {
         return self.inner.len;
     }
 
-    pub fn encode(self: *const SearchParams) !string {
+    pub fn encode(self: *const SearchParams) ![]u8 {
         const alloc = self.allocator;
-        var list = std.ArrayList(u8).init(alloc);
+        var list = std.array_list.Managed(u8).init(alloc);
         errdefer list.deinit();
         for (self.inner.items(.key), self.inner.items(.value), 0..) |k, v, i| {
             if (i > 0) try list.writer().writeAll("&");
@@ -1458,7 +1458,7 @@ fn parseHostOpaque(allocator: std.mem.Allocator, input: []const u8) ![]const u8 
 /// https://url.spec.whatwg.org/#utf-8-percent-encode
 fn percentEncode(allocator: std.mem.Allocator, input: []const u8, comptime set: fn (u8) bool) ![]u8 {
     if (!extras.matchesAny(u8, input, set)) return allocator.dupe(u8, input);
-    var result = std.ArrayList(u8).init(allocator);
+    var result = std.array_list.Managed(u8).init(allocator);
     errdefer result.deinit();
     try result.ensureUnusedCapacity(input.len);
     try percentEncodeAL(&result, input, set);
@@ -1467,7 +1467,7 @@ fn percentEncode(allocator: std.mem.Allocator, input: []const u8, comptime set: 
 
 /// https://url.spec.whatwg.org/#string-percent-decode
 pub fn percentDecode(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
-    var result = std.ArrayList(u8).init(allocator);
+    var result = std.array_list.Managed(u8).init(allocator);
     errdefer result.deinit();
     try result.ensureUnusedCapacity(input.len);
     try percentDecodeW(result.writer(), input);
@@ -1792,7 +1792,7 @@ fn lastcpi(haystack: []const u8) usize {
     while (haystack[i] & 0xC0 == 0x80) : (i -= 1) {}
     return i;
 }
-pub fn percentEncodeScalarAL(list: *std.ArrayList(u8), cp: []const u8, comptime set: fn (u8) bool) !void {
+pub fn percentEncodeScalarAL(list: *std.array_list.Managed(u8), cp: []const u8, comptime set: fn (u8) bool) !void {
     if (set(cp[0])) {
         for (cp) |b| {
             try list.append('%');
@@ -1815,7 +1815,7 @@ pub fn percentEncodeW(writer: anytype, input: []const u8, comptime set: fn (u8) 
         }
     }
 }
-pub fn percentEncodeAL(list: *std.ArrayList(u8), input: []const u8, comptime set: fn (u8) bool) !void {
+pub fn percentEncodeAL(list: *std.array_list.Managed(u8), input: []const u8, comptime set: fn (u8) bool) !void {
     var it = std.unicode.Utf8View.initUnchecked(input).iterator();
     while (it.nextCodepointSlice()) |sl| {
         if (set(sl[0])) {
@@ -1927,7 +1927,7 @@ fn nthScalarItem(T: type, haystack: []const u8, needle: T, index: usize) []const
 
 pub fn ManyArrayList(N: usize, T: type) type {
     return struct {
-        list: std.ArrayList(T),
+        list: std.array_list.Managed(T),
         lengths: [N]usize,
 
         pub fn init(allocator: std.mem.Allocator) @This() {
