@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const extras = @import("extras");
 const unicode_idna = @import("unicode-idna");
+const nio = @import("nio");
 
 pub const URL = struct {
     href: []const u8,
@@ -47,13 +48,13 @@ pub const URL = struct {
         // input is a scalar value string
         if (!std.unicode.utf8ValidateSlice(input)) return error.InvalidURL;
 
-        var inputl = std.array_list.Managed(u8).init(alloc);
+        var inputl = nio.AllocatingWriter.init(alloc);
         defer inputl.deinit();
-        try inputl.appendSlice(input);
+        try inputl.writeAll(input);
 
         // 1.
         while (inputl.items.len > 0 and is_c0control_or_space(inputl.items[0])) _ = inputl.orderedRemove(0);
-        while (inputl.items.len > 0 and is_c0control_or_space(inputl.getLast())) inputl.items.len -= 1;
+        while (inputl.items.len > 0 and is_c0control_or_space(inputl.last())) inputl.items.len -= 1;
 
         // 3.
         while (std.mem.indexOfScalar(u8, inputl.items, '\t')) |i| _ = inputl.orderedRemove(i);
@@ -70,7 +71,7 @@ pub const URL = struct {
         // we always do utf-8
 
         // 6.
-        var buffer = std.array_list.Managed(u8).init(alloc);
+        var buffer = nio.AllocatingWriter.init(alloc);
         defer buffer.deinit();
 
         // 7.
@@ -118,7 +119,7 @@ pub const URL = struct {
                     std.debug.assert(pointer == 0);
                     // 1. If c is an ASCII alpha, append c, lowercased, to buffer, and set state to scheme state.
                     if (i < length and std.ascii.isAlphabetic(c)) {
-                        try buffer.append(std.ascii.toLower(c));
+                        try buffer.writeAll(&.{std.ascii.toLower(c)});
                         state = .scheme;
                     }
                     // 2. Otherwise, if state override is not given, set state to no scheme state and decrease pointer by 1.
@@ -134,7 +135,7 @@ pub const URL = struct {
                 .scheme => {
                     // 1. If c is an ASCII alphanumeric, U+002B (+), U+002D (-), or U+002E (.), append c, lowercased, to buffer.
                     if (std.ascii.isAlphanumeric(c) or c == '+' or c == '-' or c == '.') {
-                        try buffer.append(std.ascii.toLower(c));
+                        try buffer.writeAll(&.{std.ascii.toLower(c)});
                     }
                     // 2. Otherwise, if c is U+003A (:), then:
                     else if (c == ':') {
@@ -156,7 +157,7 @@ pub const URL = struct {
                             // 2. Return.
                         }
                         // 4. Set buffer to the empty string.
-                        buffer.clearRetainingCapacity();
+                        buffer.items.len = 0;
                         // 5. If url’s scheme is "file", then:
                         if (std.mem.eql(u8, href.items(0), "file")) {
                             // 1. If remaining does not start with "//", special-scheme-missing-following-solidus validation error.
@@ -192,7 +193,7 @@ pub const URL = struct {
                     }
                     // 3. Otherwise, if state override is not given, set buffer to the empty string, state to no scheme state, and start over (from the first code point in input).
                     else if (state_override == null) {
-                        buffer.clearRetainingCapacity();
+                        buffer.items.len = 0;
                         state = .no_scheme;
                         pointer = 0;
                         i = 0;
@@ -380,7 +381,7 @@ pub const URL = struct {
                         // 1. Invalid-credentials validation error.
                         {}
                         // 2. If atSignSeen is true, then prepend "%40" to buffer.
-                        if (atSignSeen) try buffer.insertSlice(0, "%40");
+                        if (atSignSeen) try buffer.insertAt(0, "%40");
                         // 3. Set atSignSeen to true.
                         atSignSeen = true;
                         // 4. For each codePoint in buffer:
@@ -401,7 +402,7 @@ pub const URL = struct {
                             }
                         }
                         // 5. Set buffer to the empty string.
-                        buffer.clearRetainingCapacity();
+                        buffer.items.len = 0;
                     }
                     // 2. Otherwise, if one of the following is true:
                     //      - c is the EOF code point, U+002F (/), U+003F (?), or U+0023 (#)
@@ -416,12 +417,12 @@ pub const URL = struct {
                             i = lastcpi(inputl.items[0..i]);
                             c = inputl.items[i];
                         }
-                        buffer.clearRetainingCapacity();
+                        buffer.items.len = 0;
                         state = .host;
                     }
                     // 3. Otherwise, append c to buffer.
                     else {
-                        try buffer.appendSlice(inputl.items[i..][0..l(c)]);
+                        try buffer.writeAll(inputl.items[i..][0..l(c)]);
                     }
                 },
                 .host, .hostname => {
@@ -445,7 +446,7 @@ pub const URL = struct {
                         // 5. Set url’s host to host, buffer to the empty string, and state to port state.
                         try setHost(&href, h);
                         hostname_kind = h;
-                        buffer.clearRetainingCapacity();
+                        buffer.items.len = 0;
                         state = .port;
                     }
                     // 3. Otherwise, if one of the following is true:
@@ -467,7 +468,7 @@ pub const URL = struct {
                         // 5. Set url’s host to host, buffer to the empty string, and state to path start state.
                         try setHost(&href, h);
                         hostname_kind = h;
-                        buffer.clearRetainingCapacity();
+                        buffer.items.len = 0;
                         state = .path_start;
                         // 6. If state override is given, then return.
                         if (state_override != null) break;
@@ -479,13 +480,13 @@ pub const URL = struct {
                         // 2. If c is U+005D (]), then set insideBrackets to false.
                         if (c == ']') insideBrackets = false;
                         // 3. Append c to buffer.
-                        try buffer.appendSlice(inputl.items[i..][0..l(c)]);
+                        try buffer.writeAll(inputl.items[i..][0..l(c)]);
                     }
                 },
                 .port => {
                     // 1. If c is an ASCII digit, append c to buffer.
                     if (std.ascii.isDigit(c)) {
-                        try buffer.appendSlice(inputl.items[i..][0..l(c)]);
+                        try buffer.writeAll(inputl.items[i..][0..l(c)]);
                     }
                     // 2. Otherwise, if one of the following is true:
                     //  - c is the EOF code point, U+002F (/), U+003F (?), or U+0023 (#);
@@ -501,7 +502,7 @@ pub const URL = struct {
                             // 3. Set url’s port to null, if port is url’s scheme’s default port; otherwise to port.
                             if (schemeDefaultPort(href.items(0)) != p) try href.print(9, "{d}", .{p});
                             // 4. Set buffer to the empty string.
-                            buffer.clearRetainingCapacity();
+                            buffer.items.len = 0;
                             // 5. If state override is given, then return.
                             if (state_override != null) break;
                         }
@@ -655,13 +656,13 @@ pub const URL = struct {
                             // 5. If state override is given, then return.
                             if (state_override != null) break;
                             // 6. Set buffer to the empty string and state to path start state.
-                            buffer.clearRetainingCapacity();
+                            buffer.items.len = 0;
                             state = .path_start;
                         }
                     }
                     // 2. Otherwise, append c to buffer.
                     else {
-                        try buffer.appendSlice(inputl.items[i..][0..l(c)]);
+                        try buffer.writeAll(inputl.items[i..][0..l(c)]);
                     }
                 },
                 .path_start => {
@@ -743,7 +744,7 @@ pub const URL = struct {
                             try href.appendSlice(10, buffer.items);
                         }
                         // 5. Set buffer to the empty string.
-                        buffer.clearRetainingCapacity();
+                        buffer.items.len = 0;
                         // 6. If c is U+003F (?), then set url’s query to the empty string and state to query state.
                         if (c == '?') {
                             href.clear(12);
@@ -767,9 +768,9 @@ pub const URL = struct {
                         if (is_path_percent_char(c)) {
                             const pe = try percentEncode(alloc, inputl.items[i..][0..l(c)], is_path_percent_char);
                             defer alloc.free(pe);
-                            try buffer.appendSlice(pe);
+                            try buffer.writeAll(pe);
                         } else {
-                            try buffer.appendSlice(inputl.items[i..][0..l(c)]);
+                            try buffer.writeAll(inputl.items[i..][0..l(c)]);
                         }
                     }
                 },
@@ -828,7 +829,7 @@ pub const URL = struct {
                             try percentEncodeML(&href, 12, buffer.items, is_query_percent_char);
                         }
                         // 3. Set buffer to the empty string.
-                        buffer.clearRetainingCapacity();
+                        buffer.items.len = 0;
                         // 4. If c is U+0023 (#), then set url’s fragment to the empty string and state to fragment state.
                         if (c == '#') {
                             href.clear(14);
@@ -843,7 +844,7 @@ pub const URL = struct {
                         // 2. If c is U+0025 (%) and remaining does not start with two ASCII hex digits, invalid-URL-unit validation error.
                         {}
                         // 3. Append c to buffer.
-                        try buffer.appendSlice(inputl.items[i..][0..l(c)]);
+                        try buffer.writeAll(inputl.items[i..][0..l(c)]);
                     }
                 },
                 .fragment => {
@@ -1140,12 +1141,12 @@ pub const SearchParams = struct {
 
     pub fn encode(self: *const SearchParams) ![]u8 {
         const alloc = self.allocator;
-        var list = std.array_list.Managed(u8).init(alloc);
+        var list = nio.AllocatingWriter.init(alloc);
         errdefer list.deinit();
         for (self.inner.items(.key), self.inner.items(.value), 0..) |k, v, i| {
-            if (i > 0) try list.writer().writeAll("&");
+            if (i > 0) try list.writeAll("&");
             try percentEncodeAL(&list, k, is_formurlencoded_percent_char);
-            try list.append('=');
+            try list.writeAll("=");
             try percentEncodeAL(&list, v, is_formurlencoded_percent_char);
         }
         list.items.len -= std.mem.replace(u8, list.items, "%20", "+", list.items) * 2;
@@ -1458,7 +1459,7 @@ fn parseHostOpaque(allocator: std.mem.Allocator, input: []const u8) ![]const u8 
 /// https://url.spec.whatwg.org/#utf-8-percent-encode
 fn percentEncode(allocator: std.mem.Allocator, input: []const u8, comptime set: fn (u8) bool) ![]u8 {
     if (!extras.matchesAny(u8, input, set)) return allocator.dupe(u8, input);
-    var result = std.array_list.Managed(u8).init(allocator);
+    var result = nio.AllocatingWriter.init(allocator);
     errdefer result.deinit();
     try result.ensureUnusedCapacity(input.len);
     try percentEncodeAL(&result, input, set);
@@ -1467,10 +1468,10 @@ fn percentEncode(allocator: std.mem.Allocator, input: []const u8, comptime set: 
 
 /// https://url.spec.whatwg.org/#string-percent-decode
 pub fn percentDecode(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
-    var result = std.array_list.Managed(u8).init(allocator);
+    var result = nio.AllocatingWriter.init(allocator);
     errdefer result.deinit();
     try result.ensureUnusedCapacity(input.len);
-    try percentDecodeW(result.writer(), input);
+    try percentDecodeW(&result, input);
     return result.toOwnedSlice();
 }
 pub fn percentDecodeW(writer: anytype, input: []const u8) !void {
@@ -1792,11 +1793,11 @@ fn lastcpi(haystack: []const u8) usize {
     while (haystack[i] & 0xC0 == 0x80) : (i -= 1) {}
     return i;
 }
-pub fn percentEncodeScalarAL(list: *std.array_list.Managed(u8), cp: []const u8, comptime set: fn (u8) bool) !void {
+pub fn percentEncodeScalarAL(list: *nio.AllocatingWriter, cp: []const u8, comptime set: fn (u8) bool) !void {
     if (set(cp[0])) {
         for (cp) |b| {
             try list.append('%');
-            try list.writer().print("{X:0>2}", .{b});
+            try list.print("{X:0>2}", .{b});
         }
     } else {
         try list.append(cp[0]);
@@ -1815,16 +1816,16 @@ pub fn percentEncodeW(writer: anytype, input: []const u8, comptime set: fn (u8) 
         }
     }
 }
-pub fn percentEncodeAL(list: *std.array_list.Managed(u8), input: []const u8, comptime set: fn (u8) bool) !void {
+pub fn percentEncodeAL(list: *nio.AllocatingWriter, input: []const u8, comptime set: fn (u8) bool) !void {
     var it = std.unicode.Utf8View.initUnchecked(input).iterator();
     while (it.nextCodepointSlice()) |sl| {
         if (set(sl[0])) {
             for (sl) |b| {
-                try list.append('%');
-                try list.writer().print("{X:0>2}", .{b});
+                try list.writeAll("%");
+                try list.print("{X:0>2}", .{b});
             }
         } else {
-            try list.appendSlice(sl);
+            try list.writeAll(sl);
         }
     }
 }
