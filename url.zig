@@ -977,6 +977,30 @@ pub const URL = struct {
     pub fn searchParams(u: *const URL, allocator: std.mem.Allocator) !SearchParams {
         return .initFromString(allocator, u.query());
     }
+
+    pub fn isHostLocal(u: *const URL) bool {
+        switch (u.hostFancy()) {
+            .unset => {
+                return false;
+            },
+            .name => |nm| {
+                if (std.mem.eql(u8, nm, "localhost")) return true;
+                if (std.mem.endsWith(u8, nm, ".localhost")) return true;
+                if (std.mem.endsWith(u8, nm, ".test")) return true;
+                if (std.mem.endsWith(u8, nm, ".example")) return true;
+                if (std.mem.endsWith(u8, nm, ".invalid")) return true;
+                if (std.mem.endsWith(u8, nm, ".home.arpa")) return true;
+                if (std.mem.endsWith(u8, nm, ".local")) return true;
+                return false;
+            },
+            .ipv4 => {
+                return false; // TODO
+            },
+            .ipv6 => {
+                return false; // TODO
+            },
+        }
+    }
 };
 
 pub const SearchParams = struct {
