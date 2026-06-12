@@ -993,10 +993,14 @@ pub const URL = struct {
                 if (std.mem.endsWith(u8, nm, ".local")) return true;
                 return false;
             },
-            .ipv4 => {
+            .ipv4 => |ip| {
+                const parts: [4]u8 = @bitCast(ip);
+                if (parts[0] == 127) return true; // 127.0.0.0/8
                 return false; // TODO
             },
-            .ipv6 => {
+            .ipv6 => |ip| {
+                const parts: [8]u16 = @bitCast(ip);
+                _ = parts;
                 return false; // TODO
             },
         }
